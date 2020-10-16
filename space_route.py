@@ -8,11 +8,10 @@ class Face(object):
         self.e1=Edge(p1,p2)
         self.e2=Edge(p2,p3)
         self.e3=Edge(p3,p1)
+        self.nv=Vector.cross(self.e1.vector, self.e2.vector)
         
     def get_point(self):
-        self.normal_vector = Vector.cross(self.e1.vector, self.e2.vector)
-        nv = self.normal_vector
-        if nv.z < nv.x * 10000 and nv.z < nv.y * 10000 and nv.z<0:
+        if self.nv.z < self.nv.x * 10000 and self.nv.z < self.nv.y * 10000 and self.nv.z<0:
             return True
         else:
             return False
