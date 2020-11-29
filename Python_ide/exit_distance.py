@@ -7,10 +7,8 @@ settings.set(settings.USE_WORLD_COORDS,True)
 model=ifcopenshell.open('C:/Users/86137/Downloads/030811DuplexModel-IFC-2011-05-05/Duplex_A_20110505.ifc')
 settings = geom.settings()
 settings.set(settings.USE_WORLD_COORDS, True)
-d=1000
-c=0.0000001
-from Classes import Path,Line,Point,Edge,Vector,Triangle,BoundingBox
-from Points_to_pathes import get_pathes
+from basic_geometry import Point,Edge,Vector,Triangle,BoundingBox
+from points_to_paths import get_pathes
 for ira in model.by_type("IfcRelAggregates"):
     #为了从某一层开始而使用了IfcRelAggregates
     distance_of_spaces=[]
@@ -93,20 +91,24 @@ for ira in model.by_type("IfcRelAggregates"):
                                 points.append(point)
                             bb=BoundingBox(points)
                             des=bb.destination
-                            point_list.add(des)
                             print(element_to_judge.GlobalId+"__Destination: "+str(bb.destination.x)+","+str(bb.destination.y)+","+str(bb.destination.z))
                             #此刻打印出的是目标点des
                             for edge in edge_list:
-                                edge_line=edge.turn_it_to_a_line
-                                edge_distance=edge_line.distance_from_a_point(des)
+                                edge_line1=edge.turn_it_to_a_line()
+                                edge_distance=edge_line1.distance_from_a_point( edge_line1,des)
                                 distance_length_list.append(edge_distance)
                                 projection_distance=min(distance_length_list)
+                                #求出最短距离
+                            for edge in edge_list:
+                                edge_line1=edge.turn_it_to_a_line()
+                                edge_distance=edge_line1.distance_from_a_point( edge_line1,des)
                                 if distance_length_list==projection_distance:
-                                    line_of_destination=edge_line
+                                    #找出最近的线（edge）
+                                    line_of_destination=edge_line1
                                     projection_of_des=line_of_destination.get_the_projection(des)
                                     print("Projection_of_destination: "+str(projection_of_des.x)+","+str(projection_of_des.y)+","+str(projection_of_des.z))
                                     #这里打印出的是目标点des到最近的edge上的投影projection_of_des
-                                    distance_of_space=Points_to_pathes.get_pathes(point_list,projection_of_des)
+                                    distance_of_space=get_pathes(point_list,projection_of_des)
                 distance_of_spaces.append([space,distance_of_space])
                 print(space.LongName+"'s escape distance = "+str(distance_of_space))
                                         

@@ -1,4 +1,4 @@
-from Classes import Path,Line,Point,Edge,Vector,Triangle,BoundingBox
+from basic_geometry import Path,Line,Point,Edge,Vector,Triangle,BoundingBox
 Inf=float('Inf')
 def rayCasting(p, poly):
     px = p.x
@@ -31,7 +31,6 @@ def rayCasting(p, poly):
     return (px,py) if flag else 'out'
 
 def rs(point, list_of_points):
-    count = 0
     rs = rayCasting(point, list_of_points)
     if not rs == 'out':
         return False
