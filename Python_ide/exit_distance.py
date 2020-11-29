@@ -2,9 +2,12 @@ import sys
 sys.path.append('C:/IfcOpenShell/IfcOpenShell (1)/IfcOpenShell/src/ifcopenshell-python')
 import ifcopenshell
 from ifcopenshell import geom
+
+import os.path
+
 settings = geom.settings()
 settings.set(settings.USE_WORLD_COORDS,True)
-model=ifcopenshell.open('C:/Users/86137/Downloads/030811DuplexModel-IFC-2011-05-05/Duplex_A_20110505.ifc')
+model=ifcopenshell.open(os.path.dirname(__file__)+'/ifc/Duplex_A_20110505.ifc')
 settings = geom.settings()
 settings.set(settings.USE_WORLD_COORDS, True)
 from basic_geometry import Point,Edge,Vector,Triangle,BoundingBox
