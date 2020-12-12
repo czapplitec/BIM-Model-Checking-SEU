@@ -1,5 +1,50 @@
 d=1000
 c=0.0000001
+class Vector(object):
+    def __init__(self,x,y,z):
+        self.x = x
+        self.y = y
+        self.z = z
+
+    def magnitude(self):    
+        import math
+        return math.sqrt(self.x*self.x+self.y*self.y+self.z*self.z)
+
+    def normalize(self):
+        m=self.magnitude()
+        return Vector(self.x/m,self.y/m,self.z/m)
+
+    @staticmethod
+    def cross(a,b):
+        cp = Vector(a.y*b.z-a.z*b.y,a.z*b.x-a.x*b.z,a.x*b.y-a.y*b.x)
+        return cp
+    @staticmethod
+    def cross(a,b):
+        cp = Vector(a.y*b.z-a.z*b.y,a.z*b.x-a.x*b.z,a.x*b.y-a.y*b.x)
+        return cp
+
+    def equals(v1,v2):
+         if abs(v1.x-v2.x)<c and abs(v1.y-v2.y)<c and abs(v1.z-v2.z)<c:
+            return True
+         else:
+            return False
+
+    def same_direction(v1,v2):
+        n1=v1.normalize()
+        n2=v2.normalize()
+        if Vector.equals(n1,n2):
+            return True
+        else:
+            return False
+
+    def same_length(v1,v2):
+        m1=v1.magnitude()
+        m2=v2.magnitude()
+        if m1-m2<c:
+            return True
+        else:
+            return False
+
 class Path(object):
     def __init__(self,start,end):
         self.start=start
@@ -37,15 +82,14 @@ class Line(object):
             v_vertical=Vector(self.s2.x-self.s1.x,self.s1.y-self.s2.y,0)
             _dis=abs(Vector.cross(v_vertical,v1).magnitude()/(self.length))
         return _dis
-    @staticmethod
     def get_the_projection(self,t3):
         v1=Vector(t3.x-self.s1.x,t3.y-self.s1.y,0)
         v2=Vector(self.s2.x-self.s1.x,self.s2.y-self.s1.y,0)
-        k = (Vector.cross(v2,v2))/(Vector.cross(v1,v2))
+        k = (Vector.cross(v2,v2)).magnitude()/(Vector.cross(v1,v2)).magnitude()
         t0=Point(k*self.s2.x+(1-k)*self.s1.x,k*self.s2.y+(1-k)*self.s1.y,k*self.s2.z+(1-k)*self.s1.z)
         return t0
-    @staticmethod
     #get the projection of the destination to the nearset edge of the room
+    @staticmethod
     def check_and_turn(line1,line2):
         # line1 must be the border
         crossed = False
@@ -114,46 +158,6 @@ class Point(object):
     @staticmethod
     def equals(s1,s2):
         if abs(s1.x-s2.x)<c and abs(s1.y-s2.y)<c and abs(s1.z-s2.z)<c:
-            return True
-        else:
-            return False
-class Vector(object):
-    def __init__(self,x,y,z):
-        self.x = x
-        self.y = y
-        self.z = z
-
-    def magnitude(self):    
-        import math
-        return math.sqrt(self.x*self.x+self.y*self.y+self.z*self.z)
-
-    def normalize(self):
-        m=self.magnitude()
-        return Vector(self.x/m,self.y/m,self.z/m)
-
-    @staticmethod
-    def cross(a,b):
-        cp = Vector(a.y*b.z-a.z*b.y,a.z*b.x-a.x*b.z,a.x*b.y-a.y*b.x)
-        return cp
-
-    def equals(v1,v2):
-         if abs(v1.x-v2.x)<c and abs(v1.y-v2.y)<c and abs(v1.z-v2.z)<c:
-            return True
-         else:
-            return False
-
-    def same_direction(v1,v2):
-        n1=v1.normalize()
-        n2=v2.normalize()
-        if Vector.equals(n1,n2):
-            return True
-        else:
-            return False
-
-    def same_length(v1,v2):
-        m1=v1.magnitude()
-        m2=v2.magnitude()
-        if m1-m2<c:
             return True
         else:
             return False

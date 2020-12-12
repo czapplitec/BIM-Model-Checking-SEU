@@ -49,13 +49,13 @@ def get_pathes(list_of_points,destination):
                 path_line_list.add(Line(p1,p2))
     for i in range(0,number_of_frontier-1):
         frontier_line_list.add(Line(list_of_points[i],list_of_points[i+1]))
-    frontier_line_list.add(Line(list_of_points[0],list_of_points[number_of_frontier]))
+    frontier_line_list.add(Line(list_of_points[0],list_of_points[number_of_frontier-1]))
     for path in path_line_list:
         intersection=False
         #交点的个数（除端点之外）
         for frontier in frontier_line_list:
             if not path==frontier:
-                Crossed,Overlapped=Line.check_and_return
+                Crossed,Overlapped=Line.check_and_turn(frontier,path)
                 if Crossed or Overlapped:
                     intersection=True
                     #如果交叉的话则必出界
@@ -69,7 +69,7 @@ def get_pathes(list_of_points,destination):
             #删除出界path
     #下一步输出Dijkstra算法需要的矩阵
     matrix_for_all=[]
-    
+    list_of_points.append(destination)
     for p1 in list_of_points:
         list_for_this_point=[]
         for p2 in list_of_points:
@@ -83,16 +83,14 @@ def get_pathes(list_of_points,destination):
                     list_for_this_point.append(Inf)
         matrix_for_all.append(list_for_this_point)
     distance_of_all=[]
-    list_of_points.add(destination)
-    for i in range(0,len(matrix_for_all)):
-        d=dijkstra(matrix_for_all,list_of_points[i],destination,len(list_of_points))
+    for i in range(len(matrix_for_all)):
+        d=dijkstra(matrix_for_all,len(list_of_points)-1,i,len(list_of_points))
         distance_of_all.append(d)
     return max(distance_of_all)
     
 
 #dist为起点->每个结点的距离的列表。（所以起点要赋值为0:dist[src] = 0）
 # book的作用是记录已经确定了最短距离的结点的列表。
-Inf = float('inf')
 Adjacent = [[0, 1, 12, Inf, Inf, Inf],
             [Inf, 0, 9, 3, Inf, Inf],
             [Inf, Inf, 0, Inf, 5, Inf],
@@ -100,7 +98,7 @@ Adjacent = [[0, 1, 12, Inf, Inf, Inf],
             [Inf, Inf, Inf, Inf, 0, 4],
             [Inf, Inf, Inf, Inf, Inf, 0]]
 Src, Dst, N = 0, 5, 6
- 
+
 def dijkstra(adj, src, dst, n):
     dist = [Inf] * n
     dist[src] = 0
@@ -108,7 +106,8 @@ def dijkstra(adj, src, dst, n):
     # 每次找到起点到该点的最短途径
     u = src
     for _ in range(n-1):    # 找n-1次
-        book[u] = 1 # 已经确定
+        book[u] = 1 
+        # 已经确定
         # 更新距离并记录最小距离的结点
         next_u, minVal = None, float('inf')
         for v in range(n):    # w
@@ -121,10 +120,10 @@ def dijkstra(adj, src, dst, n):
                     next_u, minVal = v, dist[v]
         # 开始下一轮遍历
         u = next_u
-    print(dist)
     return dist[dst]
 
-    
+a=dijkstra(Adjacent,Src,Dst,N)
+print(a)
     
     
     
