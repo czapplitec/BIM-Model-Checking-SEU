@@ -74,6 +74,30 @@ class Line(object):
         self.s2 = s2
         self.length = math.sqrt((s2.x - s1.x) * (s2.x - s1.x) + (s2.y - s1.y) * (s2.y - s1.y))
 
+    @staticmethod
+    def get_point_line_distance(point, line):
+        import math
+        point_x = point.x
+        point_y = point.y
+        line_s_x = line.s1.x
+        line_s_y = line.s1.y
+        line_e_x = line.s2.x
+        line_e_y = line.s2.y
+        # 若直线与y轴平行，则距离为点的x坐标与直线上任意一点的x坐标差值的绝对值
+        if line_e_x - line_s_x == 0:
+            return math.fabs(point_x - line_s_x)
+        # 若直线与x轴平行，则距离为点的y坐标与直线上任意一点的y坐标差值的绝对值
+        if line_e_y - line_s_y == 0:
+            return math.fabs(point_y - line_s_y)
+        # 斜率
+        k = (line_e_y - line_s_y) / (line_e_x - line_s_x)
+        # 截距
+        b = line_s_y - k * line_s_x
+        # 带入公式得到距离dis
+        dis = math.fabs(k * point_x - point_y + b) / math.pow(k * k + 1, 0.5)
+        return dis
+    # 参考自 http://www.zzvips.com/article/57207.html
+
     def distance_from_a_point(self, t3):
         import math
         _dis = 0
@@ -88,7 +112,7 @@ class Line(object):
             v_vertical = Vector(self.s2.x - self.s1.x, self.s1.y - self.s2.y, 0)
             _dis = abs(Vector.cross(v_vertical, v1).magnitude() / (self.length))
         return _dis
-
+    # 自创原版
     def get_the_projection(self, t3):
         v1 = Vector(t3.x - self.s1.x, t3.y - self.s1.y, 0)
         v2 = Vector(self.s2.x - self.s1.x, self.s2.y - self.s1.y, 0)
@@ -96,8 +120,34 @@ class Line(object):
         t0 = Point(k * self.s2.x + (1 - k) * self.s1.x, k * self.s2.y + (1 - k) * self.s1.y,
                    k * self.s2.z + (1 - k) * self.s1.z)
         return t0
+    # 自创原版
+    def getFootPoint(self,point):
+        """
+        @point, line_p1, line_p2 : [x, y, z]
+        """
+        x0 = point.x
+        y0 = point.y
+        z0 = 0
 
-    # get the projection of the destination to the nearset edge of the room
+        line = self
+        x1 = line.s1.x
+        y1 = line.s1.y
+        z1 = 0
+
+        x2 = line.s2.x
+        y2 = line.s2.y
+        z2 = 0
+
+        k = -((x1 - x0) * (x2 - x1) + (y1 - y0) * (y2 - y1) + (z1 - z0) * (z2 - z1)) / \
+            ((x2 - x1) ** 2 + (y2 - y1) ** 2 + (z2 - z1) ** 2) * 1.0
+
+        xn = k * (x2 - x1) + x1
+        yn = k * (y2 - y1) + y1
+        zn = k * (z2 - z1) + z1
+
+        return Point(xn, yn, zn)
+    # 因为z坐标不相等会导致xy坐标的偏移，此处令z=0，即为二维平面运算
+    # 参考自 https://www.cnblogs.com/ibingshan/p/10556876.html
     @staticmethod
     def check_and_turn(line1, line2):
         # line1 must be the border
@@ -175,7 +225,8 @@ class Point(object):
             return True
         else:
             return False
-
+    def __str__(self):
+        return "x:%s , y:%d" % (self.x, self.y)
 
 class Edge(object):
     def __init__(self, s1, s2):

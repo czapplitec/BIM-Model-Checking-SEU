@@ -12,7 +12,7 @@ settings.set(settings.USE_WORLD_COORDS, True)
 import os.path
 
 model = ifcopenshell.open(os.path.dirname(__file__) + '/ifc/Duplex_A_20110505.ifc')
-from basic_geometry import Point, Edge, Vector, Triangle, BoundingBox
+from basic_geometry import Point, Edge, Vector, Triangle, BoundingBox, Line
 from points_to_paths import get_pathes
 
 # 基本设置
@@ -43,7 +43,6 @@ for ira in model.by_type("IfcRelAggregates"):
         # 对门使用BoundingBox，调出中心点打印（蓝色）
         # 经过验证，红色点能完全覆盖蓝色点。蓝色点即为所有门的坐标（所有层都存在）
 
-
         print('!!!!!!!!!!!\n!!!!!!!!!!!')
         print(space_bigger.Name + "!!!!")
         print('!!!!!!!!!!!\n!!!!!!!!!!!')
@@ -53,6 +52,7 @@ for ira in model.by_type("IfcRelAggregates"):
                 spaces.append(space_smaller)
         # 对每个房间导出平面
         for space in spaces:
+            h = 0
             distance_of_space = 250
             # 每个房间的逃生距离
             edge_list = []
@@ -108,15 +108,15 @@ for ira in model.by_type("IfcRelAggregates"):
             for edge in edge_list:
                 ax.plot([edge.start.x, edge.end.x], [edge.start.y, edge.end.y], color='black', linewidth=0.5)
                 ax.annotate(space.LongName, xy=(tag_of_space.x, tag_of_space.y))
-                ax.scatter(tag_of_space.x, tag_of_space.y, color='green', s=6)
-            print(str(space.LongName).ljust(13," ") + ": edges: " + str(len(edge_list)) + ": points: " + str(len(point_list)))
+                ax.scatter(tag_of_space.x, tag_of_space.y, color='green', s=4)
+            print(str(space.LongName).ljust(13, " ") + ": edges: " + str(len(edge_list)) + ": points: " + str(
+                len(point_list)))
             # 接下来是门，用IfcRelSpaceBoundary找
-        for irsb in model.by_type("IfcRelSpaceBoundary"):
-            space_to_judge = irsb.RelatingSpace
-            # 一个IfcRelSpaceBoundary对应一个space
-            element_to_judge = irsb.RelatedBuildingElement
-            # 一个IfcRelSpaceBoundary对应一个IfcBuildingElement
-            for space in spaces:
+            for irsb in model.by_type("IfcRelSpaceBoundary"):
+                space_to_judge = irsb.RelatingSpace
+                # 一个IfcRelSpaceBoundary对应一个space
+                element_to_judge = irsb.RelatedBuildingElement
+                # 一个IfcRelSpaceBoundary对应一个IfcBuildingElement
                 if space_to_judge == space:
                     # 锁定到每个房间
                     if not element_to_judge == None:
@@ -133,32 +133,53 @@ for ira in model.by_type("IfcRelAggregates"):
                                 points.append(point)
                             bb = BoundingBox(points)
                             des = bb.destination
-                            print(space.LongName.ljust(10,"_") + "__Destination: " + str(bb.destination.x) + "," + str(
+                            print(space.LongName.ljust(10, "_") + "__Destination: " + str(bb.destination.x) + "," + str(
                                 bb.destination.y) + "," + str(bb.destination.z))
-                            ax.scatter(bb.destination.x, bb.destination.y, color='red', s=6)
+                            ax.scatter(bb.destination.x, bb.destination.y, color='red', s=4)
                             # 此刻打印出的是目标点des（红色），注意是使用IfcRelSpaceBoundary调出的，有可能存在不全的问题
                             # 经过验证，红色点能完全覆盖蓝色点。蓝色点即为所有门的坐标（所有层都存在）
                             for edge in edge_list:
                                 edge_line1 = edge.turn_it_to_a_line()
-                                edge_distance = edge_line1.distance_from_a_point(des)
+                                # 将边转化为线
+                                edge_distance = edge_line1.get_point_line_distance(des, edge_line1)
                                 distance_length_list.append(edge_distance)
-                                projection_distance = min(distance_length_list)
-                                # 求出最短距离
+                            projection_distance = min(distance_length_list)
+                                # 先求出最短距离，再找是哪一条边
                             for edge in edge_list:
                                 edge_line1 = edge.turn_it_to_a_line()
-                                edge_distance = edge_line1.distance_from_a_point(des)
+                                edge_distance = edge_line1.get_point_line_distance(des, edge_line1)
                                 if edge_distance == projection_distance:
+                                    h+=1
                                     # 找出最近的线（edge）
                                     line_of_destination = edge_line1
-                                    projection_of_des = line_of_destination.get_the_projection(des)
-                                    print(space.LongName.ljust(10,"_") + "__Projection_of_destination: " + str(
+                                    projection_of_des = line_of_destination.getFootPoint(des)
+                                    print(space.LongName.ljust(10, "_") + "__Projection_of_destination: " + str(
                                         projection_of_des.x) + "," + str(projection_of_des.y) + "," + str(
                                         projection_of_des.z))
-                                    # ax.scatter(projection_of_des.x,projection_of_des.y,color='blue',s=6)
+                                    ax.scatter(projection_of_des.x, projection_of_des.y, color='blue', s=4)
                                     # 这里打印出的是目标点des到最近的edge上的投影projection_of_des
-                                    distance_of_space=get_pathes(point_list,projection_of_des)
-                                    distance_of_spaces.append([space,distance_of_space])
+                                    distance_of_space = get_pathes(point_list, projection_of_des)
+                                    distance_of_spaces.append([space, distance_of_space])
+                    # print("h:" + str(h))
+                else:
+                    continue
         for relationship in distance_of_spaces:
-            print(relationship[0].LongName.ljust(12," ")+"'s escape distance = "+str(relationship[1]))
+            print(relationship[0].LongName.ljust(12, " ") + "'s escape distance = " + str(relationship[1]))
+
         plt.savefig(format(str(space_bigger.Name), '0>5s') + '.png')
         plt.show()
+
+# 测试投影能否正常运行
+# fig, tx = plt.subplots()
+# test_point = Point(4, 0, 0)
+# tx.set_title("test", fontsize=18)
+# tl_start = Point(0, 0, 0)
+# tl_end = Point(5, 5, 0)
+# tx.plot([tl_start.x, tl_end.x], [tl_start.y, tl_end.y], color='black', linewidth=0.5)
+# tx.scatter(test_point.x, test_point.y, color="red", s=6)
+# test_line = Line(tl_start, tl_end)
+# projection = test_line.getFootPoint(test_point)
+# tx.scatter(projection.x, projection.y, color="blue", s=6)
+# print(projection)
+# plt.axis("equal")
+# plt.show()
