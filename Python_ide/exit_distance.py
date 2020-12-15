@@ -1,3 +1,4 @@
+Inf = float('Inf')
 import sys
 
 sys.path.append('C:\ifcopenshell_12.6')
@@ -13,7 +14,8 @@ import os.path
 
 model = ifcopenshell.open(os.path.dirname(__file__) + '/ifc/Duplex_A_20110505.ifc')
 from basic_geometry import Point, Edge, Vector, Triangle, BoundingBox, Line
-from points_to_paths import get_pathes
+from points_to_paths import get_pathes, find_sub_max, dijkstra
+import numpy as np
 
 # 基本设置
 
@@ -144,12 +146,12 @@ for ira in model.by_type("IfcRelAggregates"):
                                 edge_distance = edge_line1.get_point_line_distance(des, edge_line1)
                                 distance_length_list.append(edge_distance)
                             projection_distance = min(distance_length_list)
-                                # 先求出最短距离，再找是哪一条边
+                            # 先求出最短距离，再找是哪一条边
                             for edge in edge_list:
                                 edge_line1 = edge.turn_it_to_a_line()
                                 edge_distance = edge_line1.get_point_line_distance(des, edge_line1)
                                 if edge_distance == projection_distance:
-                                    h+=1
+                                    h += 1
                                     # 找出最近的线（edge）
                                     line_of_destination = edge_line1
                                     projection_of_des = line_of_destination.getFootPoint(des)
@@ -164,7 +166,8 @@ for ira in model.by_type("IfcRelAggregates"):
                 else:
                     continue
         for relationship in distance_of_spaces:
-            print(relationship[0].LongName.ljust(12, " ") + "'s escape distance = " + str(relationship[1]))
+            if relationship[1] < 1000:
+                print(relationship[0].LongName.ljust(12, " ") + "'s escape distance = " + str(relationship[1]))
 
         plt.savefig(format(str(space_bigger.Name), '0>5s') + '.png')
         plt.show()
@@ -183,3 +186,15 @@ for ira in model.by_type("IfcRelAggregates"):
 # print(projection)
 # plt.axis("equal")
 # plt.show()
+# print(find_sub_max([1,2,3,4],2))
+# Adjacent = [[0, 1, 12, Inf, Inf, Inf],
+#             [Inf, 0, 9, 3, Inf, Inf],
+#             [Inf, Inf, 0, Inf, 5, Inf],
+#             [Inf, Inf, 4, 0, 13, 15],
+#             [Inf, Inf, Inf, Inf, 0, 4],
+#             [Inf, Inf, Inf, Inf, Inf, 0]]
+# Src, Dst, N = 0, 5, 6
+# print(dijkstra(Adjacent, Src, Dst, N))
+#
+#
+# qwe=np.array('int')

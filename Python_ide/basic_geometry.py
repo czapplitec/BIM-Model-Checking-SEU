@@ -51,9 +51,7 @@ class Path(object):
         self.start = start
         self.end = end
         import math
-        self.length = math.sqrt(
-            (self.start.x - self.end.x) * (self.start.x - self.end.x) + (self.start.y - self.end.y) * (
-                        self.start.y - self.end.y))
+        self.length = math.sqrt((start.x - end.x) * (start.x -end.x) + (start.y - end.y) * (start.y - end.y))
         # path的起点和终点允许相等，方便使用dijkstra算法
 
     def turn_it_to_a_line(self):
