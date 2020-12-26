@@ -1,5 +1,26 @@
+import numpy as np
+
 d = 1000
 c = 0.0000001
+
+
+def find_sub_max(arr, n):
+    z = arr
+    for i in range(n - 1):
+        arr_ = arr
+        arr_[np.argmax(arr_)] = np.min(arr)
+        arr = arr_
+    return np.max(arr_), z.index(np.max(arr_))
+
+
+class Space(object):
+    def __init__(self, point_list,edge_list, destination_list, name, guid, storey_name):
+        self.point_list = point_list
+        self.edge_list = edge_list
+        self.destination_list = destination_list
+        self.name = name
+        self.guid = guid
+        self.storey_name = storey_name
 
 
 class Vector(object):
@@ -46,31 +67,13 @@ class Vector(object):
             return False
 
 
-class Path(object):
-    def __init__(self, start, end):
-        self.start = start
-        self.end = end
-        import math
-        self.length = math.sqrt((start.x - end.x) * (start.x -end.x) + (start.y - end.y) * (start.y - end.y))
-        # path的起点和终点允许相等，方便使用dijkstra算法
-
-    def turn_it_to_a_line(self):
-        return Line(self.start, self.end)
-
-    @staticmethod
-    def are_them_attached(d1, d2):
-        if Point.equals(d1.start, d2.end) or Point.equals(d2.start, d1.end):
-            return True
-        else:
-            return False
-
-
 class Line(object):
     def __init__(self, s1, s2):
         import math
         self.s1 = s1
         self.s2 = s2
         self.length = math.sqrt((s2.x - s1.x) * (s2.x - s1.x) + (s2.y - s1.y) * (s2.y - s1.y))
+        self.vector = Vector(s2.x - s1.x, s2.y - s1.y, s2.z - s1.z)
 
     @staticmethod
     def get_point_line_distance(point, line):
@@ -94,32 +97,9 @@ class Line(object):
         # 带入公式得到距离dis
         dis = math.fabs(k * point_x - point_y + b) / math.pow(k * k + 1, 0.5)
         return dis
-    # 参考自 http://www.zzvips.com/article/57207.html
 
-    def distance_from_a_point(self, t3):
-        import math
-        _dis = 0
-        v1 = Vector(t3.x - self.s1.x, t3.y - self.s1.y, 0)
-        v2 = Vector(self.s2.x - self.s1.x, self.s2.y - self.s1.y, 0)
-        k = (Vector.cross(v2, v2)).magnitude() / (Vector.cross(v1, v2)).magnitude()
-        if k <= 0:
-            _dis = math.sqrt((self.s1.x - t3.x) * (self.s1.x - t3.x) + (self.s1.y - t3.y) * (self.s1.y - t3.y))
-        if k >= 1:
-            _dis = math.sqrt((self.s2.x - t3.x) * (self.s2.x - t3.x) + (self.s2.y - t3.y) * (self.s2.y - t3.y))
-        else:
-            v_vertical = Vector(self.s2.x - self.s1.x, self.s1.y - self.s2.y, 0)
-            _dis = abs(Vector.cross(v_vertical, v1).magnitude() / (self.length))
-        return _dis
-    # 自创原版
-    def get_the_projection(self, t3):
-        v1 = Vector(t3.x - self.s1.x, t3.y - self.s1.y, 0)
-        v2 = Vector(self.s2.x - self.s1.x, self.s2.y - self.s1.y, 0)
-        k = (Vector.cross(v2, v2)).magnitude() / (Vector.cross(v1, v2)).magnitude()
-        t0 = Point(k * self.s2.x + (1 - k) * self.s1.x, k * self.s2.y + (1 - k) * self.s1.y,
-                   k * self.s2.z + (1 - k) * self.s1.z)
-        return t0
-    # 自创原版
-    def getFootPoint(self,point):
+    # 参考自 http://www.zzvips.com/article/57207.html
+    def getfootPoint(self, point):
         """
         @point, line_p1, line_p2 : [x, y, z]
         """
@@ -144,6 +124,7 @@ class Line(object):
         zn = k * (z2 - z1) + z1
 
         return Point(xn, yn, zn)
+
     # 因为z坐标不相等会导致xy坐标的偏移，此处令z=0，即为二维平面运算
     # 参考自 https://www.cnblogs.com/ibingshan/p/10556876.html
     @staticmethod
@@ -189,6 +170,59 @@ class Line(object):
             overlapped = True
         return crossed, overlapped
 
+    @staticmethod
+    def overkill(line1, line2):
+        crossed, overlapped = Line.check_and_turn(line1, line2)
+        x1 = line1.s1.x
+        x2 = line1.s2.x
+        x3 = line2.s1.x
+        x4 = line2.s2.x
+        y1 = line1.s1.y
+        y2 = line1.s2.y
+        y3 = line2.s1.y
+        y4 = line2.s2.y
+        xlist = [x1, x2, x3, x4]
+        ylist = [y1, y2, y3, y4]
+        if overlapped:
+            x_start = find_sub_max(xlist, 2)
+            x_end = find_sub_max(xlist, 3)
+            y_start = find_sub_max(ylist, 2)
+            y_end = find_sub_max(ylist, 3)
+            return Line(x_start, y_start, x_end, y_end)
+        else:
+            return None
+
+
+class Path(Line):
+    def turn_it_to_a_line(self):
+        return Line(self.s1, self.s2)
+
+    @staticmethod
+    def are_them_attached(d1, d2):
+        if Point.equals(d1.start, d2.end) or Point.equals(d2.start, d1.end):
+            return True
+        else:
+            return False
+
+
+class Edge(Line):
+    @staticmethod
+    def negative(e1, e2):
+        if Point.equals(e1.s1, e2.s2) and Point.equals(e1.s2, e2.s1):
+            return True
+        else:
+            return False
+
+    @staticmethod
+    def duplicated(e1, e2):
+        if Point.equals(e1.s1, e2.s1) and Point.equals(e1.s2, e2.s2):
+            return True
+        else:
+            return False
+
+    def turn_it_to_a_line(self):
+        return Line(self.s1, self.s2)
+
 
 class BoundingBox(object):
     def __init__(self, points):
@@ -223,31 +257,9 @@ class Point(object):
             return True
         else:
             return False
+
     def __str__(self):
         return "x:%s , y:%d" % (self.x, self.y)
-
-class Edge(object):
-    def __init__(self, s1, s2):
-        self.start = s1
-        self.end = s2
-        self.vector = Vector(s2.x - s1.x, s2.y - s1.y, s2.z - s1.z)
-
-    @staticmethod
-    def negative(e1, e2):
-        if Point.equals(e1.start, e2.end) and Point.equals(e1.end, e2.start):
-            return True
-        else:
-            return False
-
-    @staticmethod
-    def duplicated(e1, e2):
-        if Point.equals(e1.start, e2.start) and Point.equals(e1.end, e2.end):
-            return True
-        else:
-            return False
-
-    def turn_it_to_a_line(self):
-        return Line(self.start, self.end)
 
 
 class Triangle(object):
