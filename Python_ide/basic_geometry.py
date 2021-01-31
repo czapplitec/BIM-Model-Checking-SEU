@@ -13,14 +13,26 @@ def find_sub_max(arr, n):
     return np.max(arr_), z.index(np.max(arr_))
 
 
+class Storey(object):
+    def __init__(self, contained_spaces, guid, name):
+        self.contained_spaces = contained_spaces
+        self.guid = guid
+        self.name = name
+
+
 class Space(object):
-    def __init__(self, point_list,edge_list, destination_list, name, guid, storey_name):
+    def __init__(self, name, guid, storey, point_list, edge_list, destination_list, exit_distance, sequence,
+                 line_of_destination, real_destination):
         self.point_list = point_list
         self.edge_list = edge_list
         self.destination_list = destination_list
         self.name = name
         self.guid = guid
-        self.storey_name = storey_name
+        self.storey = storey
+        self.exit_distance = exit_distance
+        self.sequence = sequence
+        self.line_of_destination = line_of_destination
+        self.real_destination = real_destination
 
 
 class Vector(object):
@@ -128,7 +140,7 @@ class Line(object):
     # 因为z坐标不相等会导致xy坐标的偏移，此处令z=0，即为二维平面运算
     # 参考自 https://www.cnblogs.com/ibingshan/p/10556876.html
     @staticmethod
-    def check_and_turn(line1, line2):
+    def cross_check(line1, line2):
         # line1 must be the border
         crossed = False
         overlapped = False
@@ -184,11 +196,11 @@ class Line(object):
         xlist = [x1, x2, x3, x4]
         ylist = [y1, y2, y3, y4]
         if overlapped:
-            x_start = find_sub_max(xlist, 2)
-            x_end = find_sub_max(xlist, 3)
-            y_start = find_sub_max(ylist, 2)
-            y_end = find_sub_max(ylist, 3)
-            return Line(x_start, y_start, x_end, y_end)
+            x_start, q = find_sub_max(xlist, 2)
+            x_end, q = find_sub_max(xlist, 3)
+            y_start, q = find_sub_max(ylist, 2)
+            y_end, q = find_sub_max(ylist, 3)
+            return Line(Point(x_start, y_start, 0), Point(x_end, y_end, 0))
         else:
             return None
 
