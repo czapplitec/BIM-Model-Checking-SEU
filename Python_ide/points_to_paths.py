@@ -8,36 +8,39 @@ settings.set(settings.USE_WORLD_COORDS, True)
 Inf = float('Inf')
 
 '''
-寻找路径的步骤：
-1.输入 point_list destination 
-2.将 destination 加入之后， 单循环生成 path_line_list
-3.对每一个 path 循环，排除所有出界项
-4.把剩下的 path 转化成长度，用二维数组或矩阵表示
-5.输出矩阵
-
 对于多个destination求解的办法：（原则：dijkstra只能采用一个destination和一个起点，所以对于一个destination要先在房间的各个frontier循环）
 1.将space和space.list_of_destination输入get_paths
 2.判断destination个数，并依次运算
 3.每次运算要返回drawing_list和exit_distance，每个drawing_list对应的list_of_point是不同的
 4.求最短的exit_distance，拿着这个destination再去算一次dijkstra
 5.get_paths返回这一次的结果，主程序要再把destination给append进去才能正确绘制。
+
+寻找路径的步骤：
+1.输入 list_of_points destination 
+2.将 destination 加入之后， 单循环生成 path_line_list
+3.对每一个 path 循环，排除所有出界项
+4.把剩下的 path 转化成长度，用二维数组或矩阵表示
+5.输出矩阵进行dijkstra运算
+
+get_exit_distance是对一个space的函数，允许有多个destination
+get_paths_of_certain_destination是对一个space和其中一个特定destination的函数
+dijkstra是求路径函数
 '''
 
 
 def get_exit_distance(space):
     destination_list = space.destination_list
-    point_list = space.point_list
     distance_of_every_destination = []
     for destination in destination_list:
         exit_distance_of_this_destination, drawing_list_of_the_destination = get_paths_of_certain_destination(space,
-                                                                                                               destination)
+                                                                                                              destination)
         distance_of_every_destination.append(exit_distance_of_this_destination)
         drawing_list = drawing_list_of_the_destination
-    exit_distance = find_sub_max(distance_of_every_destination,2)
-    real_destination=destination_list[0]
+    exit_distance = find_sub_max(distance_of_every_destination, 2)
+    real_destination = destination_list[0]
     for destination in destination_list:
         exit_distance_of_this_destination, drawing_list_of_the_destination = get_paths_of_certain_destination(space,
-                                                                                                               destination)
+                                                                                                              destination)
         if exit_distance_of_this_destination == exit_distance:
             real_destination = destination
             drawing_list = drawing_list_of_the_destination
@@ -45,12 +48,12 @@ def get_exit_distance(space):
 
 
 def get_paths_of_certain_destination(space, destination):
-    point_list = space.point_list
+    list_of_points = space.point_list
     frontier_line_list = set()
     path_line_list = set()
-    for p1 in point_list:
+    for p1 in list_of_points:
         path_line_list.add(Line(destination, p1))
-        for p2 in point_list:
+        for p2 in list_of_points:
             if not p1 == p2:
                 path_line_list.add(Line(p1, p2))
     path_line_list_duplicated = []
@@ -63,42 +66,51 @@ def get_paths_of_certain_destination(space, destination):
         if dp in path_line_list.copy():
             path_line_list.remove(dp)
     # 除重，未排除出界项
-    for i in range(0, len(point_list) - 1):
-        frontier_line_list.add(Line(point_list[i], point_list[i + 1]))
-    frontier_line_list.add(Line(point_list[0], point_list[len(point_list) - 1]))
+    for i in range(0, len(list_of_points) - 1):
+        frontier_line_list.add(Line(list_of_points[i], list_of_points[i + 1]))
+    frontier_line_list.add(Line(list_of_points[0], list_of_points[len(list_of_points) - 1]))
+    # 用point_list来输出frontier_line_list
     # 下一步输出Dijkstra算法需要的矩阵
-    # 可能存在由于destination顺序不对的问题
-    original_lop = point_list
-    point_list.append(destination)
-    q = len(point_list)
+    new_lop = list_of_points
+    new_lop.append(destination)
+    # list_of_points就是space.point_list,new_lop是加上destination之后的，用于dijkstra运算。new_lop不能包含边界信息，因为顺序是乱的。
+    # 边界信息用frontier_line_list来表示
+    q = len(new_lop)
     matrix_for_all = np.zeros(shape=(q, q))
     i = 0
-    for p1 in point_list:
+    for p1 in new_lop:
         list_for_this_point = []
-        for p2 in point_list:
+        for p2 in new_lop:
             path_trial = Path(p1, p2)
             if p1 == p2:
                 list_for_this_point.append(0)
+                # 如果点重合，即代表距离是0
             else:
-                outcome = line_check(frontier_line_list, point_list, path_trial)
+                outcome = line_check(frontier_line_list, new_lop, path_trial)
+                # 如果path与frontier相交，且交点不是端点，则出界
+                # 否则，就是path完全在内部或外部的情况，此时用点来检测（都包含在line_check内部）
+                # 出界则outcome=True
                 if not outcome:
                     list_for_this_point.append(path_trial.length)
                 else:
                     list_for_this_point.append(Inf)
+                    # 出界，则两点距离为无限大
         matrix_for_all[i] = list_for_this_point
         i += 1
+        # i 是点在new_lop的index
     distance_of_single_destination = []
-    for i in range(len(point_list)):
+    for i in range(len(new_lop)):
         exit_distance_of_any_frontier, drawing_list_of_any_frontier = dijkstra(matrix_for_all, i,
-                                                                               len(point_list) - 1, len(point_list))
+                                                                               len(new_lop) - 1, len(new_lop))
         distance_of_single_destination.append(exit_distance_of_any_frontier)
-        drawing_list_of_this_destination=drawing_list_of_any_frontier
+        drawing_list_of_this_destination = drawing_list_of_any_frontier
     exit_distance_of_this_destination = find_sub_max(
         distance_of_single_destination, 2)
+    # 求出距离最大的一个
 
-    for i in range(len(point_list)):
+    for i in range(len(new_lop)):
         exit_distance_of_any_frontier, drawing_list_of_any_frontier = dijkstra(matrix_for_all, i,
-                                                                               len(point_list) - 1, len(point_list))
+                                                                               len(new_lop) - 1, len(new_lop))
         if exit_distance_of_any_frontier == exit_distance_of_this_destination:
             drawing_list_of_this_destination = drawing_list_of_any_frontier
     return exit_distance_of_this_destination, drawing_list_of_this_destination
@@ -146,7 +158,7 @@ def dijkstra(adj, src, dst, n):
 """
 
 
-def line_check(frontier_line_list, point_list, path):
+def line_check(frontier_line_list, list_of_points, path):
     outcome = False
     path_line = path.turn_it_to_a_line()
     for frontier in frontier_line_list:
@@ -157,7 +169,7 @@ def line_check(frontier_line_list, point_list, path):
             else:
                 mid_point = Point((path_line.s1.x + path_line.s2.x) / 2, (path_line.s1.y + path_line.s2.y) / 2,
                                   path_line.s1.z)
-                outcome = point_check(mid_point, point_list)
+                outcome = point_check(mid_point, list_of_points)
     return outcome
 
 
@@ -201,7 +213,7 @@ def point_check(p, poly):
 def get_plan(space):
     edge_list = []
     line_list = []
-    point_list = []
+    list_of_points = []
     shape = geom.create_shape(settings, space)
     verts = shape.geometry.verts
     faces = shape.geometry.faces
@@ -234,9 +246,18 @@ def get_plan(space):
                 edge_list.remove(e)
     for edge in edge_list:
         line_list.append(edge.turn_it_to_a_line)
-        point_list.append(edge.s1)
+        list_of_points.append(edge.s1)
         # 确认边清理完毕后，点列即为“每个边的端点”，此处取起点
-    return edge_list, line_list, point_list
+    for anything in list_of_points:
+        if anything is None:
+            print("None! in list_of_points")
+    for anything in line_list:
+        if anything is None:
+            print("None! in line_list")
+    for anything in edge_list:
+        if anything is None:
+            print("None! in edge_list")
+    return edge_list, line_list, list_of_points
 
 
 def door_to_destination(door):
@@ -253,7 +274,6 @@ def door_to_destination(door):
     return des
 
 
-# 除重算法，space1,space2 是房间，removal是“要不要去掉space2
 def overkill(space1, space2):
     space2_origin = space2
     removal = False
@@ -271,12 +291,16 @@ def overkill(space1, space2):
     return removal, space1, space2
 
 
-# 以下出界为True，未出界为False
-# 这个函数用来输出矩阵中的第n大的值，用于dijkstra算法。因为最大值是inf，所以最大逃生距离是第二大的值
+# 除重算法，space1,space2 是房间，removal是“要不要去掉space2
+# 目前还没用上
+
+
 def find_sub_max(arr, n):
     z = arr
     for i in range(n - 1):
         arr_ = arr
         arr_[np.argmax(arr_)] = np.min(arr)
         arr = arr_
-    return np.max(arr_),  # z.index(np.max(arr_))
+    return np.max(arr_)  # ,   z.index(np.max(arr_))
+# 这个函数用来输出矩阵中的第n大的值，用于dijkstra算法之后
+# 因为最大值是inf，所以最大逃生距离是第二大的值
