@@ -1,45 +1,151 @@
 import numpy as np
+import math
+import ifcopenshell
+from sympy import *
+from ifcopenshell import geom
+from points_to_paths import bounding_box
+import os.path
 
-d = 1000
-c = 0.0000001
+model = ifcopenshell.open(os.path.dirname(__file__) + '/ifc/Duplex_A_20110505.ifc')
 
-
-def find_sub_max(arr, n):
-    z = arr
-    for i in range(n - 1):
-        arr_ = arr
-        arr_[np.argmax(arr_)] = np.min(arr)
-        arr = arr_
-    return np.max(arr_), z.index(np.max(arr_))
-
-
-class Storey(object):
-    def __init__(self, contained_spaces, guid, name):
-        self.contained_spaces = contained_spaces
-        self.guid = guid
-        self.name = name
-
-
-class Space(object):
-    def __init__(self, name, guid, storey, point_list, edge_list, destination_list, exit_distance, sequence,
-                 line_of_destination, real_destination):
-        self.point_list = point_list
-        self.edge_list = edge_list
-        self.destination_list = destination_list
-        self.name = name
-        self.guid = guid
-        self.storey = storey
-        self.exit_distance = exit_distance
-        self.sequence = sequence
-        self.line_of_destination = line_of_destination
-        self.real_destination = real_destination
+settings = geom.settings()
+settings.set(settings.USE_WORLD_COORDS, True)
+APPROXIMATION = 100
+a = len(str(APPROXIMATION))
+"""
+basic_geometry是包含了所有类对象的tab。
+1.包括：
+    ZPoint（三维点）
+    Point（二维点）
+    Vector
+    Line
+    Space
+    Door
+2.每个类对象都包含：基本的函数、说明、初步的自动化操作、打印形式
+3.不包含：自定义函数如bounding_box、dijkstra等等；mat plot绘图
+"""
 
 
-class Vector(object):
+def approximation_of_a_real_number(amy):
+    return int(amy * APPROXIMATION) / APPROXIMATION
+
+
+########################################################################################################################
+########################################################################################################################
+class ZPoint(object):
+    """
+    ZPoint是三维点
+    """
+
     def __init__(self, x, y, z):
-        self.x = x
-        self.y = y
-        self.z = z
+        self.x = approximation_of_a_real_number(x)
+        self.y = approximation_of_a_real_number(y)
+        self.z = approximation_of_a_real_number(z)
+
+    @staticmethod
+    def point_check_overlap(p1, p2):
+        """
+        检验两个点是否重合
+        （因为输入的过程中已有取整，所以不用写成约等于）
+        """
+        if p1.x == p2.x and p1.y == p2.y and p1.z == p2.z:
+            return True
+        else:
+            return False
+
+    def __str__(self):
+        app = len(str(APPROXIMATION))
+        msg = "(3D Point)" + str(self.x).ljust(app, " ") + str(self.y).ljust(app, " ") + str(self.z).ljust(app, " ")
+        return msg
+
+    def get_dimensional(self):
+        """
+        二维化
+        （在门的bounding box中有作用，目前的解决方式是直接在verts中取前两位生成二维点）
+        """
+        return Point(self.x, self.y)
+
+
+########################################################################################################################
+########################################################################################################################
+class Point(object):
+    """
+    Point是二维点
+    """
+
+    def __init__(self, x, y):
+        self.x = approximation_of_a_real_number(x)
+        self.y = approximation_of_a_real_number(y)
+
+    @staticmethod
+    def point_check_overlap(p1, p2):
+        """
+        检验两个点是否重合
+        （因为输入的过程中已有取整，所以不用写成约等于）
+        """
+        if p1.x == p2.x and p1.y == p2.y:
+            return True
+        else:
+            return False
+
+    def __str__(self):
+        msg = "(Point) " + "x:" + str(self.x).ljust(a, " ") + "y:" + str(self.y).ljust(a, " ")
+        return msg
+
+
+########################################################################################################################
+########################################################################################################################
+class Vector(object):
+    """
+    本程序中，Vector必须用点生成，其np形式随之自动生成
+    Vector内置函数包括：
+        1. 加减乘除（以免np.array形式不兼容）
+        2. 检查一个面是否向上(vector_check_vertical)
+    """
+
+    def __init__(self, p1, p2):
+        self.start = p1
+        self.end = p2
+        self.x = p2.x - p1.x
+        self.y = p2.y - p1.y
+        self.z = p2.z - p1.z
+        self.arr = np.array([self.x, self.y, self.z])
+
+    def __str__(self):
+        msg = "(Vector) " + str(self.x).ljust(a, " ") + str(self.y).ljust(a, " ") + str(self.z).ljust(a,
+                                                                                                      " ") \
+              + " start:" + str(self.start) + " end:" + str(self.end)
+        return msg
+
+    @staticmethod
+    def sub(v1, v2):
+        return v1.arr - v2.arr
+
+    @staticmethod
+    def multiply(v1, v2):
+        return Vector(ZPoint(0, 0, 0),
+                      ZPoint(v1.y * v2.z - v1.z * v2.y, v1.z * v2.x - v1.x * v2.z, v1.x * v2.y - v1.y * v2.x))
+
+    @staticmethod
+    def vector_check_vertical(v1, v2):
+        v = Vector.multiply(v1, v2)
+        if v.x <= 1 / APPROXIMATION and v.y <= 1 / APPROXIMATION and v.z < 0:
+            return True
+        else:
+            return False
+
+    @staticmethod
+    def vector_check_parallel(v1, v2):
+        """
+        先求模，再变为标向量，再看是不是相等
+        """
+        c = 1 / APPROXIMATION
+        v1 = v1.normalize()
+        v2 = v2.normalize()
+        if abs(v1.x - v2.x) < c and abs(v1.y - v2.y) < c and abs(v1.z - v2.z) < c:
+            return True
+        else:
+            return False
 
     def magnitude(self):
         import math
@@ -47,238 +153,258 @@ class Vector(object):
 
     def normalize(self):
         m = self.magnitude()
-        return Vector(self.x / m, self.y / m, self.z / m)
-
-    @staticmethod
-    def cross(a, b):
-        cp = Vector(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x)
-        return cp
-
-    def equals(v1, v2):
-        if abs(v1.x - v2.x) < c and abs(v1.y - v2.y) < c and abs(v1.z - v2.z) < c:
-            return True
-        else:
-            return False
-
-    @staticmethod
-    def same_direction(v1, v2):
-        n1 = v1.normalize()
-        n2 = v2.normalize()
-        if Vector.equals(n1, n2):
-            return True
-        else:
-            return False
-
-    @staticmethod
-    def same_length(v1, v2):
-        m1 = v1.magnitude()
-        m2 = v2.magnitude()
-        if m1 - m2 < c:
-            return True
-        else:
-            return False
+        return Vector(ZPoint(0, 0, 0), ZPoint(self.x / m, self.y / m, self.z / m))
 
 
+########################################################################################################################
+########################################################################################################################
 class Line(object):
-    def __init__(self, s1, s2):
-        import math
-        self.s1 = s1
-        self.s2 = s2
-        self.length = math.sqrt((s2.x - s1.x) * (s2.x - s1.x) + (s2.y - s1.y) * (s2.y - s1.y))
-        self.vector = Vector(s2.x - s1.x, s2.y - s1.y, s2.z - s1.z)
+    """
+    line和vector本质的区别在于vector是三维的而line是二维的
+    line在此处指线段
+    line也是用起点和终点生成的
+    line内置函数包括：
+        1. 求点是否在直线上(line_check_point_on)
+        2. 求直线是否相交或重叠等等(line_check_cross)
+        3. 求垂足(line_get_foot)
+        4. 求点到直线距离(line_get_point_distance)
+        5. 求合并直线(line_get_overkill)
+    Line用标准式Ax+By+C=0表示，水平则A=0，垂直则B=0
+    【疑问】合并直线目前还没有用上
+    """
 
-    @staticmethod
-    def get_point_line_distance(point, line):
-        import math
-        point_x = point.x
-        point_y = point.y
-        line_s_x = line.s1.x
-        line_s_y = line.s1.y
-        line_e_x = line.s2.x
-        line_e_y = line.s2.y
-        # 若直线与y轴平行，则距离为点的x坐标与直线上任意一点的x坐标差值的绝对值
-        if line_e_x - line_s_x == 0:
-            return math.fabs(point_x - line_s_x)
-        # 若直线与x轴平行，则距离为点的y坐标与直线上任意一点的y坐标差值的绝对值
-        if line_e_y - line_s_y == 0:
-            return math.fabs(point_y - line_s_y)
-        # 斜率
-        k = (line_e_y - line_s_y) / (line_e_x - line_s_x)
-        # 截距
-        b = line_s_y - k * line_s_x
-        # 带入公式得到距离dis
-        dis = math.fabs(k * point_x - point_y + b) / math.pow(k * k + 1, 0.5)
-        return dis
-
-    # 参考自 http://www.zzvips.com/article/57207.html
-    def getfootPoint(self, point):
+    def __init__(self, p1, p2):
         """
-        @point, line_p1, line_p2 : [x, y, z]
+        直线用两个点形成。
+        表达式为标准式。
+        【疑问】在测试中，出现了完全重合的两个点的直线。
         """
-        x0 = point.x
-        y0 = point.y
-        z0 = 0
-
-        line = self
-        x1 = line.s1.x
-        y1 = line.s1.y
-        z1 = 0
-
-        x2 = line.s2.x
-        y2 = line.s2.y
-        z2 = 0
-
-        k = -((x1 - x0) * (x2 - x1) + (y1 - y0) * (y2 - y1) + (z1 - z0) * (z2 - z1)) / \
-            ((x2 - x1) ** 2 + (y2 - y1) ** 2 + (z2 - z1) ** 2) * 1.0
-
-        xn = k * (x2 - x1) + x1
-        yn = k * (y2 - y1) + y1
-        zn = k * (z2 - z1) + z1
-
-        return Point(xn, yn, zn)
-
-    # 因为z坐标不相等会导致xy坐标的偏移，此处令z=0，即为二维平面运算
-    # 参考自 https://www.cnblogs.com/ibingshan/p/10556876.html
-    @staticmethod
-    def cross_check(line1, line2):
-        # line1 must be the border
-        crossed = False
-        overlapped = False
-        x = y = 0
-        x1 = line1.s1.x
-        x2 = line1.s2.x
-        x3 = line2.s1.x
-        x4 = line2.s2.x
-        y1 = line1.s1.y
-        y2 = line1.s2.y
-        y3 = line2.s1.y
-        y4 = line2.s2.y
-        if (x2 - x1) == 0:
-            k1 = None
+        self.start = p1
+        self.end = p2
+        self.x = p2.x - p1.x
+        self.y = p2.y - p1.y  # 终点减起点
+        self.arr = np.array([self.x, self.y])
+        self.A = p2.y - p1.y
+        self.B = p1.x - p2.x
+        self.C = p2.x * p1.y - p1.x * p2.y
+        # 修改ABC，使之符合标准式
+        if p2.y - p1.y == 0:  # 水平，A=0，B为1
+            self.A = 0
+            self.B = 1
+            if p1.x - p2.x == 0:
+                self.C = None
+            else:
+                self.C = (p2.x * p1.y - p1.x * p2.y) / (p1.x - p2.x)
+        elif p2.x - p1.x == 0:  # 垂直，B=0，A为1
+            self.A = 1
+            self.B = 0
+            if p1.y - p2.y == 0:
+                self.C = None
+            else:
+                self.C = (p2.x * p1.y - p1.x * p2.y) / (p2.y - p1.y)
         else:
-            k1 = (y2 - y1) * 1.0 / (x2 - x1)
-            b1 = y1 * 1.0 - x1 * k1 * 1.0
-        if (x4 - x3) == 0:
-            k2 = None
-            b2 = 0
-        else:
-            k2 = (y4 - y3) * 1.0 / (x4 - x3)
-            b2 = y3 * 1.0 - x3 * k2 * 1.0
-        if k1 is None:
-            if not k2 is None:
-                x = x1
-                y = k2 * x1 + b2
-                crossed = True
-        elif k2 is None:
-            x = x3
-            y = k1 * x3 + b1
-        elif not k2 == k1:
-            x = (b2 - b1) * 1.0 / (k1 - k2)
-            y = k1 * x * 1.0 + b1 * 1.0
-            crossed = True
-        if x == x1 and y == y1:
-            overlapped = True
-        if x == x2 and y == y2:
-            overlapped = True
-        return crossed, overlapped
+            self.A = (p2.y - p1.y) / (p2.y - p1.y)
+            self.B = (p1.x - p2.x) / (p2.y - p1.y)
+            self.C = (p2.x * p1.y - p1.x * p2.y) / (p2.y - p1.y)
+
+    def __str__(self):
+        msg = "(Line) " + ("(" + str(self.A) + ")*x+(" + str(self.B) + ")*y+(" + str(
+            self.C) + ") = 0").ljust(35, " ") + " start:" + str(self.start) + " end:" + str(self.end)
+        return msg
 
     @staticmethod
-    def overkill(line1, line2):
-        crossed, overlapped = Line.check_and_turn(line1, line2)
-        x1 = line1.s1.x
-        x2 = line1.s2.x
-        x3 = line2.s1.x
-        x4 = line2.s2.x
-        y1 = line1.s1.y
-        y2 = line1.s2.y
-        y3 = line2.s1.y
-        y4 = line2.s2.y
-        xlist = [x1, x2, x3, x4]
-        ylist = [y1, y2, y3, y4]
-        if overlapped:
-            x_start, q = find_sub_max(xlist, 2)
-            x_end, q = find_sub_max(xlist, 3)
-            y_start, q = find_sub_max(ylist, 2)
-            y_end, q = find_sub_max(ylist, 3)
-            return Line(Point(x_start, y_start, 0), Point(x_end, y_end, 0))
-        else:
-            return None
-
-
-class Path(Line):
-    def turn_it_to_a_line(self):
-        return Line(self.s1, self.s2)
+    def line_check_point_on(line, p):
+        return p.x * line.A + p.y * line.B + line.C == 0
 
     @staticmethod
-    def are_them_attached(d1, d2):
-        if Point.equals(d1.start, d2.end) or Point.equals(d2.start, d1.end):
-            return True
+    def line_check_cross(l1, l2):
+        a1 = l1.A
+        a2 = l2.A
+        b1 = l1.B
+        b2 = l2.B
+        c1 = l1.C
+        c2 = l2.C
+        # 首先检测重合
+        if a1 == a2 and b1 == b2:  # 平行
+            if c1 == c2:  # 完全重合
+                return "[SHARED] totally the same"
+            else:  # 平行，检测是否有重合
+                if Line.line_check_point_on(l1, l2.start) or Line.line_check_point_on(l1, l2.end):
+                    return "[SHARED] can be composed"
+                else:  # 平行,不重合
+                    return "[SEPARATED]"
+        else:  # 不平行
+            x = Symbol('x')
+            y = Symbol('y')
+            dictionary = solve([a1 * x + b1 * y + c1, a2 * x + b2 * y + c2], [x, y])  # 解方程，若a和b不等于端点x和y，则在中间相交
+            new_x = dictionary.get(x)
+            new_y = dictionary.get(y)
+            math.isclose(new_x, l1.start.x)
+            if (math.isclose(new_x, l1.start.x) & math.isclose(new_y, l1.start.y)) | (
+                    math.isclose(new_x, l1.end.x) & math.isclose(new_y, l1.end.y)) | (
+                    math.isclose(new_x, l2.start.x) & math.isclose(new_y, l2.start.y)) | (
+                    math.isclose(new_x, l2.end.x) & math.isclose(new_y, l2.end.y)):
+                return "[CROSSED]: on edge"
+            else:
+                return "[CROSSED]: not on edge"
+
+    @staticmethod
+    def line_get_foot(line, p):
+        if Line.line_check_point_on(line, p):
+            print("You are trying to get foot point from a point on the line, it doesn't exist.")
+            return ConnectionRefusedError
         else:
-            return False
+            x0 = p.x
+            y0 = p.y
+            x1 = line.start.x
+            y1 = line.start.y
+            x2 = line.end.x
+            y2 = line.end.y
+            k = -((x1 - x0) * (x2 - x1) + (y1 - y0) * (y2 - y1)) / \
+                ((x2 - x1) ** 2 + (y2 - y1) ** 2) * 1.0
+            x_n = k * (x2 - x1) + x1
+            y_n = k * (y2 - y1) + y1
+            return Point(x_n, y_n)
 
+    @staticmethod
+    def line_get_point_distance(line, p):
+        foot = Line.line_get_foot(line, p)
+        if foot != ConnectionRefusedError:
+            distance = math.sqrt((foot.x - p.x) ** 2 + (foot.y - p.y) ** 2)
+            return distance
 
-class Edge(Line):
+    @staticmethod
+    def line_get_overkill(l1, l2):
+        if Line.line_check_cross(l1, l2) == "can be attached":
+            if Line.line_check_point_on(l1, l2.start) and not Line.line_check_point_on(l1,
+                                                                                       l2.end):
+                # 若l2start在l1上，l2end不在，则l2end是端点
+                if Line.line_check_point_on(l2, l1.start):
+                    # 若l1start在l2上，l1end不在，则l1end是端点
+                    return Line(l2.end, l1.end)
+                if Line.line_check_point_on(l2, l1.end):
+                    # 若l1end在l2上，l1start不在，则l1start是端点
+                    return Line(l2.end, l1.start)
+            if Line.line_check_point_on(l1, l2.start) and Line.line_check_point_on(l1,
+                                                                                   l2.end):
+                # 若l2start在l1上，l2end也在，则l1end和l1start是端点
+                return l1
+            if not Line.line_check_point_on(l1, l2.start) and Line.line_check_point_on(l1,
+                                                                                       l2.end):
+                # 若l2start不在l1上，l2end在，则l2start是端点
+                if Line.line_check_point_on(l2, l1.start):
+                    # 若l1start在l2上，l1end不在，则l1end是端点
+                    return Line(l2.start, l1.end)
+                if Line.line_check_point_on(l2, l1.end):
+                    # 若l1end在l2上，l1start不在，则l1start是端点
+                    return Line(l2.start, l1.start)
+
     @staticmethod
     def negative(e1, e2):
-        if Point.equals(e1.s1, e2.s2) and Point.equals(e1.s2, e2.s1):
+        if Point.point_check_overlap(e1.start, e2.end) and Point.point_check_overlap(e1.end, e2.start):
             return True
         else:
             return False
 
     @staticmethod
     def duplicated(e1, e2):
-        if Point.equals(e1.s1, e2.s1) and Point.equals(e1.s2, e2.s2):
+        if Point.point_check_overlap(e1.start, e2.start) and Point.point_check_overlap(e1.end, e2.end):
             return True
         else:
             return False
 
-    def turn_it_to_a_line(self):
-        return Line(self.s1, self.s2)
 
+########################################################################################################################
+########################################################################################################################
+class Space(object):
+    """
+    Space代表房间，需要point_list和frontier_list、destination_list等等
+    内置的方法有：
+    1. 直接用geom输出point_list等等(__init__)
+    2. 寻找逃生路径
+    3. （可能在未来用上）设定房间为逃生目的地、指出楼梯空间
+    值得注意的是，此处不进行IFC OPEN SHELL的调用
+    """
 
-class BoundingBox(object):
-    def __init__(self, points):
-        p = points[0]
-        self.min = Point(p.x, p.y, p.z)
-        self.max = Point(p.x, p.y, p.z)
-        for point in points:
-            if point.x < self.min.x:
-                self.min.x = point.x
-            if point.y < self.min.y:
-                self.min.y = point.y
-            if point.z < self.min.z:
-                self.min.z = point.z
-            if point.x > self.max.x:
-                self.max.x = point.x
-            if point.y > self.max.y:
-                self.max.y = point.y
-            if point.z > self.max.z:
-                self.max.z = point.z
-        self.destination = Point((self.max.x + self.min.x) / 2, (self.max.y + self.min.y) / 2, self.min.z)
-
-
-class Point(object):
-    def __init__(self, x, y, z):
-        self.x = x
-        self.y = y
-        self.z = z
-
-    @staticmethod
-    def equals(s1, s2):
-        if abs(s1.x - s2.x) < c and abs(s1.y - s2.y) < c and abs(s1.z - s2.z) < c:
-            return True
-        else:
-            return False
+    def __init__(self, storey_name, space_guid, space_longname, space_itself):
+        shape = geom.create_shape(settings, space_itself)
+        verts = shape.geometry.verts
+        faces = shape.geometry.faces
+        edge_list_original = []
+        point_list = []
+        # 输入坐标环节，是程序中唯一的三维部分
+        for i in range(0, len(faces) - 1, 3):
+            p1 = ZPoint(verts[3 * faces[i] + 0], verts[3 * faces[i] + 1],
+                        verts[3 * faces[i] + 2])
+            p2 = ZPoint(verts[3 * faces[i + 1] + 0], verts[3 * faces[i + 1] + 1],
+                        verts[3 * faces[i + 1] + 2])
+            p3 = ZPoint(verts[3 * faces[i + 2] + 0], verts[3 * faces[i + 2] + 1],
+                        verts[3 * faces[i + 2] + 2])
+            nv = Vector.multiply(Vector(p1, p2), Vector(p1, p3))
+            ref = Vector(ZPoint(0, 0, -1), ZPoint(0, 0, 0))
+            if Vector.vector_check_parallel(ref, nv):
+                edge_list_original.append(Line(p1, p2))
+                edge_list_original.append(Line(p2, p3))
+                edge_list_original.append(Line(p1, p3))
+        edge_list_substitute = edge_list_original
+        duplicated_edges = set()
+        # 除重环节
+        for edge in edge_list_substitute:
+            for e in edge_list_substitute:
+                if Line.negative(edge, e):
+                    duplicated_edges.add(edge)
+                    duplicated_edges.add(e)
+        for edge in duplicated_edges:
+            for e in edge_list_substitute:
+                if Line.duplicated(edge, e):
+                    edge_list_substitute.remove(e)
+        edge_list = edge_list_substitute
+        for edge in edge_list:
+            point_list.append(edge.start)  # 确认边清理完毕后，点列即为“每个边的端点”，此处取起点
+        tag_of_space = bounding_box(point_list)  # tag_of_space是标签的起点
+        self.point_list = point_list
+        self.edge_list = edge_list
+        self.tag_of_space = tag_of_space
+        self.destination_list = []
+        self.distance_list = []
+        self.drawing_list = []
+        self.best_destination = None
+        self.exit_distance = None
+        self.storey_name = storey_name
+        self.space_longname = space_longname
+        self.space_guid = space_guid
 
     def __str__(self):
-        return "x:%s , y:%d" % (self.x, self.y)
+        msg = "(Space): " + "Storey: " + str(self.storey_name) + "  Name: " + str(
+            self.space_longname) + "  Guid: " + str(self.space_guid) + "  Has got ? destinations: " + str(
+            str(self.destination_list)) + "  The best one is: " + str(
+            self.best_destination) + "  Exit distance: " + str(self.exit_distance)
+        return msg
 
 
-class Triangle(object):
-    def __init__(self, s1, s2, p3):
-        self.s1 = s1
-        self.s2 = s2
-        self.p3 = p3
-        self.e1 = Edge(s1, s2)
-        self.e2 = Edge(s2, p3)
-        self.e3 = Edge(p3, s1)
+########################################################################################################################
+########################################################################################################################
+class Door(object):
+    """
+    Door是门
+    内置的方法如下：
+    1. 直接生成bounding_box
+    值得注意的是，求投影的步骤应在主程序中进行。
+    """
+
+    def __init__(self, space_belonged, door_guid):
+        shape = geom.create_shape(settings, self)
+        verts = shape.geometry.verts
+        points = []
+        for i in range(0, len(verts) - 1, 3):
+            point = Point(verts[i], verts[i + 1])
+            points.append(point)
+        bb = bounding_box(points)
+        self.destination = bb
+        self.space_belonged = space_belonged
+        self.door_guid = door_guid
+
+    def __str__(self):
+        msg = "(Door): " + "Space: " + str(self.space_belonged) + "  Destination: " + str(
+            self.destination) + "  Guid: " + str(self.door_guid)
+        return msg

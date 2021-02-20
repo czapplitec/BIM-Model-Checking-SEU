@@ -1,134 +1,192 @@
 import sys
+import numpy as np
 import ifcopenshell
 from ifcopenshell import geom
 import os.path
 from matplotlib import pyplot as plt
-from basic_geometry import Point, Edge, Vector, Triangle, BoundingBox, Line, Space, Storey
-from points_to_paths import get_exit_distance, find_sub_max, dijkstra, get_plan, door_to_destination
+from basic_geometry import Point, Line, Space, Door
+from points_to_paths import dijkstra, point_check_polygon, line_check, find_sub_max
 
-sys.path.append('C:\ifcopenshell_12.6')
-Inf = float('Inf')
 model = ifcopenshell.open(os.path.dirname(__file__) + '/ifc/Duplex_A_20110505.ifc')
+Inf = float('Inf')
 settings = geom.settings()
 settings.set(settings.USE_WORLD_COORDS, True)
-storeys = []
+plt.figure(figsize=(100, 100))
 
-print("########### stage 1 finding spaces #############")
+########################################################################################################################
+########################################################################################################################
+print("TEST START")
+TEST_POINT1 = Point(0, 0)
+TEST_POINT2 = Point(4, 4)
+TEST_POINT3 = Point(0, 4)
+TEST_POINT4 = Point(4, 0)
+TEST_LINE1 = Line(TEST_POINT1, TEST_POINT2)
+TEST_LINE2 = Line(TEST_POINT3, TEST_POINT4)
+print(TEST_LINE1)
+print(TEST_LINE2)
+# print(help(Line.line_check_cross(TEST_LINE1,TEST_LINE2)))
+print(str(Line.line_check_cross(TEST_LINE1, TEST_LINE2)))
+print("TEST END")
+########################################################################################################################
+########################################################################################################################
 for ira in model.by_type("IfcRelAggregates"):
-    # 为了从某一层开始而使用了IfcRelAggregates
-    distance_of_each_space = []
+    """
+    本循环建立于"IfcRelAggregates"，目的在于建立房间的平面信息（具体方法在类定义里面）
+    space_bigger可能是层，spaces_smaller可能是房间
+    """
     space_bigger = ira.RelatingObject
     spaces_smaller = ira.RelatedObjects
     if space_bigger.is_a("IfcBuildingStorey"):
+        fig, ax = plt.subplots()
+        plt.axis("equal")
+        ax.set_title(space_bigger.Name, fontsize=18)
         spaces = []
         for space_smaller in spaces_smaller:
             if space_smaller.is_a("IfcSpace"):
                 spaces.append(space_smaller)
-        space_bigger = Storey(spaces, space_bigger.GlobalId, space_bigger.Name)
-        storeys.append(space_bigger)
-print("########### stage 1 done #######################")
-print("########### stage 2 forming frontier ###########")
-for storey in storeys:
-    spaces = storey.contained_spaces
-    classified_spaces = []
-    for space in spaces:
-        edge_list, line_list, point_list = get_plan(space)  # 存放边界 转化为直线的边界 边界点
-        # 以上的这些在每个Space中是唯一的
-        space = Space(space.LongName, space.GlobalId, storey.name, point_list, edge_list,
-                      destination_list=None, exit_distance=None, sequence=None, line_of_destination=None,
-                      real_destination=None)
-        print(str(space.name).ljust(16, " ") + "   guid(" + str(space.guid) + ")   story(" + str(
-            storey.name) + "): edges: " + str(
-            len(space.edge_list)) + ": points: " + str(
-            len(space.point_list)))
-        classified_spaces.append(space)
-    storey.contained_spaces = classified_spaces
-print("########### stage 2 done ####################")
-print("########### stage 3 exit distance ###########")
-
-# 接下来是门，用IfcRelSpaceBoundary找
-# 这个循环是建立在space上面的
-for storey in storeys:
-    spaces = storey.contained_spaces
-    for space in spaces:
-        destination_list = []  # 因为有可能存在多个目标点
-        drawing_list = []  # 但只有一条最短路径（取点的集合）
-        distance_length_list = []  # 这是过程变量，不用返回
-        exit_distance_list = []
-        print(str(space.name).ljust(11, " ") + "(test) " + "   guid(" + str(
-            space.guid) + ")   story(" + str(
-            storey.name) + "): edges: " + str(
-            len(space.edge_list)) + ": points: " + str(
-            len(space.point_list)))
-        # 测试一下，为什么point_list的元素个数变多了？每有一个des，len(point_list)就会加2
-        for irsb in model.by_type("IfcRelSpaceBoundary"):
-            space_to_judge = irsb.RelatingSpace
-            # 一个IfcRelSpaceBoundary对应一个space
-            element_to_judge = irsb.RelatedBuildingElement
-            # 一个IfcRelSpaceBoundary对应一个IfcBuildingElement
-            if space_to_judge.GlobalId == space.guid:
-                # 锁定到每个房间
-                if element_to_judge is not None:
-                    if element_to_judge.is_a("IfcDoor"):
-                        door = element_to_judge
-                        des = door_to_destination(door)
-                        # des 是door的boundingbox点
-                        for edge in space.edge_list:
-                            edge_line1 = edge.turn_it_to_a_line()
-                            edge_distance = edge_line1.get_point_line_distance(des, edge_line1)
-                            # 把边界转化为line类型，调用get_point_line_distance求destination到各frontier直线的长度
-                            distance_length_list.append(edge_distance)
-                        projection_distance = min(distance_length_list)
-                        # 先求出最短距离，再找是哪一条边
-                        for edge in space.edge_list:
-                            edge_line1 = edge.turn_it_to_a_line()
-                            edge_distance = edge_line1.get_point_line_distance(des, edge_line1)
-                            if edge_distance == projection_distance:  # 找出最近的线（edge）
-                                space.line_of_destination = edge_line1  # 这个房间的门线是line_of_destination
-                                projection_of_des = edge_line1.getfootPoint(
-                                    des)  # projection_of_des是des的投影点，也是用于计算的destination
-                                destination_list.append(
-                                    projection_of_des)  # 输出投影 projection_of_des,门线 line_of_destination
-                        space.destination_list = destination_list
-                        real_exit_distance, real_drawing_list, real_des = get_exit_distance(space)  # 求路径的方法
-                        space.exit_distance = real_exit_distance
-                        space.sequence = real_drawing_list
-                        space.real_destination = real_des
-                        print(str(space.name).ljust(18, " ") + "   guid(" + str(space.guid) + ")   story(" + str(
-                            storey.name) + "): edges: " + str(
-                            len(space.edge_list)) + ": points: " + str(
-                            len(space.point_list)))
-print("########### stage 3 done ##############")
-print("########### stage 4 drawing ###########")
-# 目前报错为 Traceback (most recent call last):
-#   File "C:/repositories/BIM-Model-Checking-SEU/Python_ide/exit_distance.py", line 114, in <module>
-#     for projection_of_des in space.destination_list:
-# TypeError: 'NoneType' object is not iterable
-# for storey in storeys:
-#     spaces = storey.contained_spaces
-#     fig, ax = plt.subplots()
-#     plt.axis("equal")
-#     plt.figure(figsize=(100, 100))
-#     ax.set_title(storey.name, fontsize=18)
-#     for space in spaces:
-#         point_list = space.point_list
-#         point_list.append(real_des)
-#         tag_of_space = BoundingBox(space.point_list).destination
-#         drawing_list = space.sequence
-#         for projection_of_des in space.destination_list:
-#             ax.scatter(projection_of_des.x, projection_of_des.y, color='blue', s=4)
-#         for edge in space.edge_list:
-#             ax.plot([edge.s1.x, edge.s2.x], [edge.s1.y, edge.s2.y], color='black', linewidth=0.5)
-#             ax.annotate(space.name, xy=(tag_of_space.x, tag_of_space.y))
-#             ax.scatter(tag_of_space.x, tag_of_space.y, color='green', s=4)
-#         for i in range(len(drawing_list) - 1):
-#             start = space.point_list[drawing_list[i]]
-#             end = space.point_list[drawing_list[i + 1]]
-#             ax.plot([start.x, end.x], [start.y, end.y], color='purple', linewidth=1)
-#         print(str(space.name) + ": edges: " + str(len(space.edge_list)) + ": points: " + str(
-#             len(space.point_list)))
-#         print(space.name + "'s escape distance = " + str(space.exit_distance))
-#     plt.savefig(format(str(storey.name), '0>5s') + '.png')
-#     plt.show()
-#
-# print("########### stage 4 done ##############")
+        for space in spaces:
+            """
+            子循环，包含了：
+                1.平面生成、创建每个房间的基本属性对象(edge point destination)
+                2.作图
+            """
+            space = Space(space_bigger.Name, space.GlobalId, space.LongName, space)
+            edge_list = space.edge_list
+            point_list = space.point_list
+            # 1.平面生成、创建每个房间的基本属性对象(edge point destination)
+            for edge in edge_list:
+                ax.plot([edge.start.x, edge.end.x], [edge.start.y, edge.end.y], linewidth=2)
+                ax.annotate(space.space_longname + ":" + str(len(space.point_list)),
+                            xy=(space.tag_of_space.x, space.tag_of_space.y))
+                ax.scatter(space.tag_of_space.x, space.tag_of_space.y, color='green', s=4)
+            print(
+                str(space.space_longname).ljust(13, " ") + ": edges: " + str(len(edge_list)) + ": points: " + str(
+                    len(space.point_list)))
+            # 2.作图
+            for IfcRelSpaceBoundary in model.by_type("IfcRelSpaceBoundary"):
+                """
+                本循环建立于"IfcRelSpaceBoundary"，主要负责由门到Destination的转化（包括投影）
+                一个IfcRelSpaceBoundary对应一个space，一个IfcRelSpaceBoundary对应一个IfcBuildingElement
+                本循环包括了：
+                    3.找门
+                    4.求投影：首先对edge循环，然后找最近的 然后用line内置方法
+                    5.求距离：（对destination_list循环，然后找最近的）
+                        （1）：排除出界量
+                        （2）：转换为二维数组
+                        （3）：进入dijkstra算法
+                特别注意：edge也是line对象
+                """
+                space_to_judge = IfcRelSpaceBoundary.RelatingSpace
+                element_to_judge = IfcRelSpaceBoundary.RelatedBuildingElement
+                if space_to_judge == space:
+                    destination_list_original = []
+                    if element_to_judge is not None:
+                        if element_to_judge.is_a("IfcDoor"):
+                            element_to_judge = Door(space, element_to_judge.GlobalId)
+                            des = element_to_judge.destination
+                            # 3.找门
+                            distance_list_for_each_destination = []
+                            for edge in edge_list:
+                                edge_distance = edge.line_get_point_distance(des, edge)
+                                distance_list_for_each_destination.append(edge_distance)
+                            projection_distance = min(distance_list_for_each_destination)
+                            for edge in edge_list:
+                                edge_distance = edge.line_get_point_distance(des, edge)
+                                if edge_distance == projection_distance:
+                                    line_of_destination = edge
+                                    projection_of_des = line_of_destination.line_get_foot(des)
+                                    destination_list_original.append(projection_of_des)
+                    space.destination_list = destination_list_original
+                    exit_distance_list = []
+                    # 4.求投影
+                    for destination in space.destination_list:
+                        """
+                        求距离的循环，因为存在一个房间多个门的情况，必须首先对des循环
+                        本循环包含了：
+                            5.求距离：（对destination_list循环，然后找最近的）
+                                5.1：排除出界量
+                                    5.1.1：建立基本属性对象
+                                    5.1.2：路径除重
+                                    5.1.3：排除出界
+                                5.2：转换为二维数组
+                                5.3：开始循环，进入dijkstra算法
+                        """
+                        list_of_point = space.point_list
+                        frontier_line_list = set()
+                        path_line_list = set()
+                        n = len(list_of_point)
+                        # 5.1.1：建立基本属性对象list_of_point点 frontier_line_list边界 path_line_list路径 n是个数
+                        for p1 in list_of_point:
+                            path_line_list.add(Line(destination, p1))
+                            for p2 in list_of_point:
+                                if not p1 == p2:
+                                    path_line_list.add(Line(p1, p2))
+                        path_line_list_duplicated = []
+                        for pl1 in path_line_list:
+                            for pl2 in path_line_list:
+                                if not pl1 == pl2:
+                                    if pl1.start == pl2.end and pl1.end == pl2.start:
+                                        path_line_list_duplicated.append(pl2)
+                        for dp in path_line_list.copy():
+                            if dp in path_line_list_duplicated:
+                                path_line_list.remove(dp)
+                        # 5.1.2：路径除重
+                        for i in range(0, n - 1):
+                            frontier_line_list.add(Line(list_of_point[i], list_of_point[i + 1]))
+                        frontier_line_list.add(Line(list_of_point[0], list_of_point[n - 1]))
+                        list_of_point_original = list_of_point
+                        list_of_point.append(destination)
+                        q = len(list_of_point)
+                        matrix_for_all = np.zeros(shape=(q, q))
+                        for p1 in list_of_point:
+                            list_for_this_point = []
+                            for p2 in list_of_point:
+                                path_trial = Line(p1, p2)
+                                if p1 == p2:
+                                    list_for_this_point.append(0)
+                                else:
+                                    if not line_check(frontier_line_list, list_of_point, path_trial):
+                                        list_for_this_point.append(path_trial.length)
+                                    else:
+                                        list_for_this_point.append(Inf)
+                            matrix_for_all[i] = list_for_this_point
+                        distance_of_all = []
+                        # 5.1.3 排除出界
+                        # 5.2 转化为二维数组
+                        for i in range(len(list_of_point)):
+                            """
+                            5.3: 寻找最短路径
+                                5.3.1：对每个destination求最短距离
+                                5.3.2：找到所有destination最短的路径
+                                （特别注意：drawing_list必须搭配append过destination的point_list使用）
+                                5.3.3：绘制最短路径
+                            """
+                            distance_of_any_frontier, drawing_list_of_any_frontier = dijkstra(matrix_for_all, i,
+                                                                                              len(list_of_point) - 1,
+                                                                                              len(list_of_point))
+                            # 此时的drawing_list并不一定是需要的路径
+                            distance_of_all.append(distance_of_any_frontier)
+                            if max(distance_of_all) == Inf:
+                                answer, answer_index = find_sub_max(distance_of_all, 2)
+                            else:
+                                answer, answer_index = find_sub_max(distance_of_all, 1)
+                            pre_exit_distance, pre_drawing_list = dijkstra(matrix_for_all, answer_index,
+                                                                           len(list_of_point) - 1,
+                                                                           len(list_of_point))
+                            exit_distance_list.append([destination, pre_exit_distance, pre_drawing_list])
+                            # 求出本destination的路径
+                    e_club = []  # 临时集合，用来找出最短路径距离值
+                    for e in exit_distance_list:
+                        e_club.append(e[1])
+                    e_min = min(e_club)
+                    e_min_index = e_club.index(e_min)
+                    space.exit_distance = e_min
+                    space.drawing_list = exit_distance_list[e_min_index][2]
+                    list_of_point = space.point_list.append(exit_distance_list[e_min_index][0])
+                    # 5.3.2：找到所有destination最短的路径 特别注意：drawing_list必须搭配append过destination的point_list使用
+                    drawing_list = space.drawing_list
+                    for i in range(len(drawing_list) - 2):
+                        start = list_of_point[drawing_list[i]]
+                        end = list_of_point[drawing_list[i + 1]]
+                        ax.plot([start.x, end.x], [start.y, end.y], color='purple', linewidth=0.3)
+    plt.show()
