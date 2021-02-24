@@ -1,5 +1,6 @@
 import sys
 import numpy as np
+import time
 import ifcopenshell
 from ifcopenshell import geom
 import os.path
@@ -16,16 +17,10 @@ plt.figure(figsize=(100, 100))
 ########################################################################################################################
 ########################################################################################################################
 print("TEST START")
-TEST_POINT1 = Point(0, 0)
-TEST_POINT2 = Point(4, 4)
-TEST_POINT3 = Point(0, 4)
-TEST_POINT4 = Point(4, 0)
-TEST_LINE1 = Line(TEST_POINT1, TEST_POINT2)
-TEST_LINE2 = Line(TEST_POINT3, TEST_POINT4)
-print(TEST_LINE1)
-print(TEST_LINE2)
-# print(help(Line.line_check_cross(TEST_LINE1,TEST_LINE2)))
-print(str(Line.line_check_cross(TEST_LINE1, TEST_LINE2)))
+q=True
+w=False
+if q and not w:
+    print(1<=2)
 print("TEST END")
 ########################################################################################################################
 ########################################################################################################################
@@ -37,9 +32,11 @@ for ira in model.by_type("IfcRelAggregates"):
     space_bigger = ira.RelatingObject
     spaces_smaller = ira.RelatedObjects
     if space_bigger.is_a("IfcBuildingStorey"):
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(40, 40))
         plt.axis("equal")
-        ax.set_title(space_bigger.Name, fontsize=18)
+        localtime = time.asctime(time.localtime(time.time()))
+        title = space_bigger.Name + str(localtime)
+        ax.set_title(title, fontsize=128)
         spaces = []
         for space_smaller in spaces_smaller:
             if space_smaller.is_a("IfcSpace"):
@@ -49,20 +46,25 @@ for ira in model.by_type("IfcRelAggregates"):
             子循环，包含了：
                 1.平面生成、创建每个房间的基本属性对象(edge point destination)
                 2.作图
+            【疑问】：FOYER的点为0
+            
             """
             space = Space(space_bigger.Name, space.GlobalId, space.LongName, space)
             edge_list = space.edge_list
             point_list = space.point_list
             # 1.平面生成、创建每个房间的基本属性对象(edge point destination)
+            ax.annotate(space.space_longname + ":" + str(len(space.point_list)),
+                        xy=(space.tag_of_space.x - 2.4, space.tag_of_space.y + 0.6), fontsize=72)
+            ax.scatter(space.tag_of_space.x, space.tag_of_space.y, color='green', s=4, alpha=0.5)
             for edge in edge_list:
-                ax.plot([edge.start.x, edge.end.x], [edge.start.y, edge.end.y], linewidth=2)
-                ax.annotate(space.space_longname + ":" + str(len(space.point_list)),
-                            xy=(space.tag_of_space.x, space.tag_of_space.y))
-                ax.scatter(space.tag_of_space.x, space.tag_of_space.y, color='green', s=4)
-            print(
-                str(space.space_longname).ljust(13, " ") + ": edges: " + str(len(edge_list)) + ": points: " + str(
-                    len(space.point_list)))
-            # 2.作图
+                ax.plot([edge.start.x, edge.end.x], [edge.start.y, edge.end.y], linewidth=4, color='black', alpha=0.3)
+                ax.scatter(edge.start.x, edge.start.y, color='red', s=25, alpha=0.5)
+                ax.scatter(edge.end.x, edge.end.y, color='blue', s=25, alpha=0.5)
+            # for point in point_list:
+            #     ax.scatter(point.x, point.y, color='red', s=25, alpha=0.5)
+            print(space)
+        # plt.show()
+        # 2.作图
             for IfcRelSpaceBoundary in model.by_type("IfcRelSpaceBoundary"):
                 """
                 本循环建立于"IfcRelSpaceBoundary"，主要负责由门到Destination的转化（包括投影）
@@ -188,5 +190,5 @@ for ira in model.by_type("IfcRelAggregates"):
                     for i in range(len(drawing_list) - 2):
                         start = list_of_point[drawing_list[i]]
                         end = list_of_point[drawing_list[i + 1]]
-                        ax.plot([start.x, end.x], [start.y, end.y], color='purple', linewidth=0.3)
+                        ax.plot([start.x, end.x], [start.y, end.y], color='purple', linewidth=4)
     plt.show()

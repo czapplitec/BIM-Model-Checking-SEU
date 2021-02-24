@@ -129,21 +129,26 @@ def bounding_box(list_of_points):
     求中心点的算法。
     list_of_points是二维点的集合
     返回其中心点
+    【疑问：有时list_of_points为空集，目前解决手段是返回指定点0，0；但是据图来看，没有这样的问题】
+    【疑问：目前位置不准】
     """
-    p = list_of_points[0]
-    minimal_point = Point(p.x, p.y)
-    maximal_point = Point(p.x, p.y)
-    for anypoint in list_of_points:
-        px = anypoint.x
-        py = anypoint.y
-        if px < minimal_point.x:
-            if py < minimal_point.y:
-                minimal_point = anypoint
-        if px > maximal_point.x:
-            if py > maximal_point.y:
-                maximal_point = anypoint
+    if not list_of_points:
+        return Point(0,0)
+    else:
+        p = list_of_points[0]
+        minimal_point = Point(p.x, p.y)
+        maximal_point = Point(p.x, p.y)
+        for anypoint in list_of_points:
+            px = anypoint.x
+            py = anypoint.y
+            if px < minimal_point.x:
+                if py < minimal_point.y:
+                    minimal_point = anypoint
+            if px > maximal_point.x:
+                if py > maximal_point.y:
+                    maximal_point = anypoint
 
-    return Point((maximal_point.x + minimal_point.x) / 2, (maximal_point.y + minimal_point.y) / 2)
+        return Point((maximal_point.x + minimal_point.x) / 2, (maximal_point.y + minimal_point.y) / 2)
 
 
 #

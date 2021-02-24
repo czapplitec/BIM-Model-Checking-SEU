@@ -171,6 +171,7 @@ class Line(object):
         5. 求合并直线(line_get_overkill)
     Line用标准式Ax+By+C=0表示，水平则A=0，垂直则B=0
     【疑问】合并直线目前还没有用上
+    【疑问】Line的除重与除逆必须用近似值处理
     """
 
     def __init__(self, p1, p2):
@@ -214,7 +215,7 @@ class Line(object):
 
     @staticmethod
     def line_check_point_on(line, p):
-        return p.x * line.A + p.y * line.B + line.C == 0
+        return abs(p.x * line.A + p.y * line.B + line.C) <= 1 / 100
 
     @staticmethod
     def line_check_cross(l1, l2):
@@ -229,14 +230,18 @@ class Line(object):
             if c1 == c2:  # 完全重合
                 return "[SHARED] totally the same"
             else:  # 平行，检测是否有重合
-                if Line.line_check_point_on(l1, l2.start) or Line.line_check_point_on(l1, l2.end):
+                if Line.line_check_point_on(l1, l2.start):
+                    return "[SHARED] can be composed"
+                if Line.line_check_point_on(l1, l2.end):
                     return "[SHARED] can be composed"
                 else:  # 平行,不重合
                     return "[SEPARATED]"
         else:  # 不平行
             x = Symbol('x')
             y = Symbol('y')
-            dictionary = solve([a1 * x + b1 * y + c1, a2 * x + b2 * y + c2], [x, y])  # 解方程，若a和b不等于端点x和y，则在中间相交
+            dictionary = solve([a1 * x + b1 * y + c1, a2 * x + b2 * y + c2], [x, y])
+            # 这里有时会报错 unsupported operands
+            # 解方程，若a和b不等于端点x和y，则在中间相交
             new_x = dictionary.get(x)
             new_y = dictionary.get(y)
             math.isclose(new_x, l1.start.x)
@@ -275,29 +280,35 @@ class Line(object):
 
     @staticmethod
     def line_get_overkill(l1, l2):
-        if Line.line_check_cross(l1, l2) == "can be attached":
+        if Line.line_check_cross(l1, l2) == "[SHARED] can be composed":
             if Line.line_check_point_on(l1, l2.start) and not Line.line_check_point_on(l1,
                                                                                        l2.end):
                 # 若l2start在l1上，l2end不在，则l2end是端点
                 if Line.line_check_point_on(l2, l1.start):
                     # 若l1start在l2上，l1end不在，则l1end是端点
+                    # 【经过检测，这一条不会触发】
                     return Line(l2.end, l1.end)
-                if Line.line_check_point_on(l2, l1.end):
+                elif Line.line_check_point_on(l2, l1.end):
                     # 若l1end在l2上，l1start不在，则l1start是端点
+                    # 【经过检测，这一条不会触发】
                     return Line(l2.end, l1.start)
-            if Line.line_check_point_on(l1, l2.start) and Line.line_check_point_on(l1,
-                                                                                   l2.end):
+            elif Line.line_check_point_on(l1, l2.start) and Line.line_check_point_on(l1,
+                                                                                     l2.end):
                 # 若l2start在l1上，l2end也在，则l1end和l1start是端点
                 return l1
-            if not Line.line_check_point_on(l1, l2.start) and Line.line_check_point_on(l1,
-                                                                                       l2.end):
+            else:
                 # 若l2start不在l1上，l2end在，则l2start是端点
                 if Line.line_check_point_on(l2, l1.start):
                     # 若l1start在l2上，l1end不在，则l1end是端点
+                    # 【经过检测，这一条不会触发】
                     return Line(l2.start, l1.end)
-                if Line.line_check_point_on(l2, l1.end):
+                elif Line.line_check_point_on(l2, l1.end):
                     # 若l1end在l2上，l1start不在，则l1start是端点
+                    # 【经过检测，这一条不会触发】
                     return Line(l2.start, l1.start)
+                    # Line(Point(0,0),Point(4,4))
+        else:
+            return None
 
     @staticmethod
     def negative(e1, e2):
@@ -345,20 +356,43 @@ class Space(object):
             if Vector.vector_check_parallel(ref, nv):
                 edge_list_original.append(Line(p1, p2))
                 edge_list_original.append(Line(p2, p3))
-                edge_list_original.append(Line(p1, p3))
+                edge_list_original.append(Line(p3, p1))
         edge_list_substitute = edge_list_original
         duplicated_edges = set()
-        # 除重环节
+        # 除相反环节:用negative
         for edge in edge_list_substitute:
             for e in edge_list_substitute:
                 if Line.negative(edge, e):
                     duplicated_edges.add(edge)
                     duplicated_edges.add(e)
+        # 除重环节
         for edge in duplicated_edges:
             for e in edge_list_substitute:
                 if Line.duplicated(edge, e):
                     edge_list_substitute.remove(e)
-        edge_list = edge_list_substitute
+        edge_list_substitute_substitute = edge_list_substitute
+        """
+        overkill环节
+        edge_list_substitute_substitute是第二个替代品（用于在for循环中不显得混乱）
+        1.原始列表 edge_list_substitute
+        2.for循环 e1与e2判断
+        3.为了保证不重复计算，每一次生效的overkill对list的影响必须立刻实现
+        4.直到不能再overkill时，停止
+        """
+        for e1 in edge_list_substitute_substitute:
+            for e2 in edge_list_substitute_substitute:
+                if e1 != e2:
+                    # 【疑问】：overkill尚存在问题。
+                    if Line.line_check_cross(e1, e2) == "[SHARED] can be composed":
+                        new_line = Line.line_get_overkill(e1, e2)
+                        edge_list_substitute_substitute.remove(e1)
+                        index = edge_list_substitute_substitute.index(e2)
+                        edge_list_substitute_substitute.insert(index, new_line)
+                        edge_list_substitute_substitute.remove(e2)
+                    if Line.line_check_cross(e1, e2) == "[SHARED] totally the same":
+                        edge_list_substitute_substitute.remove(e1)
+        # overkill done
+        edge_list = edge_list_substitute_substitute
         for edge in edge_list:
             point_list.append(edge.start)  # 确认边清理完毕后，点列即为“每个边的端点”，此处取起点
         tag_of_space = bounding_box(point_list)  # tag_of_space是标签的起点
@@ -375,10 +409,12 @@ class Space(object):
         self.space_guid = space_guid
 
     def __str__(self):
-        msg = "(Space): " + "Storey: " + str(self.storey_name) + "  Name: " + str(
-            self.space_longname) + "  Guid: " + str(self.space_guid) + "  Has got ? destinations: " + str(
-            str(self.destination_list)) + "  The best one is: " + str(
-            self.best_destination) + "  Exit distance: " + str(self.exit_distance)
+        msg = "(Space): " + "{Storey}: " + str(self.storey_name) + "  {Name}: " + str(
+            self.space_longname).ljust(12, " ") + "  {Guid}: " + str(
+            self.space_guid) + "  {Has got ? destinations}: " + str(
+            str(self.destination_list)) + "  {The best one is}: " + str(
+            self.best_destination) + "  {Exit distance}: " + str(self.exit_distance) + "  {POINTS}: " + str(
+            len(self.point_list)) + "  {EDGES}: " + str(len(self.edge_list))
         return msg
 
 
