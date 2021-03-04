@@ -215,7 +215,22 @@ class Line(object):
 
     @staticmethod
     def line_check_point_on(line, p):
-        return abs(p.x * line.A + p.y * line.B + line.C) <= 1 / 100
+        r_factor = 1 / 20
+        if line.start.x <= line.end.x:
+            left_x = line.start.x
+            right_x = line.end.x
+        else:
+            right_x = line.start.x
+            left_x = line.end.x
+        if abs(p.x * line.A + p.y * line.B + line.C) <= r_factor and left_x <= p.x <= right_x:
+            return True
+        else:
+            return False
+
+    """
+    【3月4日检测】：r_factor等于1 / 20时也没用，怀疑问题出在其他方面
+    【3月4日检测】：发现问题是没有规定直线的边界点 已修复。
+    """
 
     @staticmethod
     def line_check_cross(l1, l2):
@@ -360,6 +375,7 @@ class Space(object):
         edge_list_substitute = edge_list_original
         duplicated_edges = set()
         # 除相反环节:用negative
+        # 【3月4日备注】：线的顺序不一定对，但是朝向是统一的。
         for edge in edge_list_substitute:
             for e in edge_list_substitute:
                 if Line.negative(edge, e):

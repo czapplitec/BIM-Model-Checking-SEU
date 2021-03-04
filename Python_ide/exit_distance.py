@@ -13,14 +13,18 @@ Inf = float('Inf')
 settings = geom.settings()
 settings.set(settings.USE_WORLD_COORDS, True)
 plt.figure(figsize=(100, 100))
-
+"""
+【3月4日检测】：
+1. 一层整体存在偏移问题
+2. foyer不能正确显示
+3. overkill不能正确返回（每一次都是若l2start在l1上，l2end也在，则l1end和l1start是端点）
+4. 后段代码未响应。
+5. boundingbox点明显不对
+"""
 ########################################################################################################################
 ########################################################################################################################
 print("TEST START")
-q=True
-w=False
-if q and not w:
-    print(1<=2)
+
 print("TEST END")
 ########################################################################################################################
 ########################################################################################################################
@@ -50,6 +54,7 @@ for ira in model.by_type("IfcRelAggregates"):
             
             """
             space = Space(space_bigger.Name, space.GlobalId, space.LongName, space)
+            # 这一步输入了space在ifc文件中能找到的信息。edge_list，point_list都是已经过overkill的版本
             edge_list = space.edge_list
             point_list = space.point_list
             # 1.平面生成、创建每个房间的基本属性对象(edge point destination)
@@ -59,7 +64,7 @@ for ira in model.by_type("IfcRelAggregates"):
             for edge in edge_list:
                 ax.plot([edge.start.x, edge.end.x], [edge.start.y, edge.end.y], linewidth=4, color='black', alpha=0.3)
                 ax.scatter(edge.start.x, edge.start.y, color='red', s=25, alpha=0.5)
-                ax.scatter(edge.end.x, edge.end.y, color='blue', s=25, alpha=0.5)
+                ax.scatter(edge.end.x, edge.end.y, color='blue', s=50, alpha=0.5)
             # for point in point_list:
             #     ax.scatter(point.x, point.y, color='red', s=25, alpha=0.5)
             print(space)
