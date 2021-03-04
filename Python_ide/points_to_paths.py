@@ -133,26 +133,31 @@ def bounding_box(list_of_points):
     【疑问：目前位置不准】
     """
     if not list_of_points:
-        return Point(0,0)
+        return Point(0, 0)
     else:
         p = list_of_points[0]
         minimal_point = Point(p.x, p.y)
         maximal_point = Point(p.x, p.y)
         for anypoint in list_of_points:
+            minx = minimal_point.x
+            maxx = maximal_point.x
+            miny = minimal_point.y
+            maxy = maximal_point.y
             px = anypoint.x
             py = anypoint.y
-            if px < minimal_point.x:
-                if py < minimal_point.y:
-                    minimal_point = anypoint
-            if px > maximal_point.x:
-                if py > maximal_point.y:
-                    maximal_point = anypoint
+            if px <= minx:
+                minimal_point = Point(px, miny)
+            if py <= miny:
+                minimal_point = Point(minx, py)
+            if px >= maxx:
+                maximal_point = Point(px, maxy)
+            if py >= maxy:
+                maximal_point = Point(maxx, py)
 
-        return Point((maximal_point.x + minimal_point.x) / 2, (maximal_point.y + minimal_point.y) / 2)
+        return Point((maxx + minx) / 2, (maxy + miny) / 2)
 
 
-#
-#
+
 # 这个函数用来输出矩阵中的第n大的值，用于dijkstra算法。因为最大值是inf，所以最大逃生距离是第二大的值
 def find_sub_max(arr, n):
     z = arr

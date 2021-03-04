@@ -10,7 +10,7 @@ model = ifcopenshell.open(os.path.dirname(__file__) + '/ifc/Duplex_A_20110505.if
 
 settings = geom.settings()
 settings.set(settings.USE_WORLD_COORDS, True)
-APPROXIMATION = 100
+APPROXIMATION = 75
 a = len(str(APPROXIMATION))
 """
 basic_geometry是包含了所有类对象的tab。
@@ -215,7 +215,7 @@ class Line(object):
 
     @staticmethod
     def line_check_point_on(line, p):
-        r_factor = 1 / 20
+        r_factor = 1 / 15
         if line.start.x <= line.end.x:
             left_x = line.start.x
             right_x = line.end.x
@@ -228,7 +228,6 @@ class Line(object):
             return False
 
     """
-    【3月4日检测】：r_factor等于1 / 20时也没用，怀疑问题出在其他方面
     【3月4日检测】：发现问题是没有规定直线的边界点 已修复。
     """
 
@@ -241,13 +240,17 @@ class Line(object):
         c1 = l1.C
         c2 = l2.C
         # 首先检测重合
-        if a1 == a2 and b1 == b2:  # 平行
+        t_factor = 1 / 10
+        if abs(a1 - a2) <= t_factor and abs(b1 - b2) <= t_factor:
+            # if a1 == a2 and b1 == b2:  # 平行
             if c1 == c2:  # 完全重合
-                return "[SHARED] totally the same"
+                return "[SHARED] can be composed"
+                # 【3月4日检测】：有一部分overkill失败的原因就是错误当成重合
+                # return "[SHARED] totally the same"
             else:  # 平行，检测是否有重合
                 if Line.line_check_point_on(l1, l2.start):
                     return "[SHARED] can be composed"
-                if Line.line_check_point_on(l1, l2.end):
+                elif Line.line_check_point_on(l1, l2.end):
                     return "[SHARED] can be composed"
                 else:  # 平行,不重合
                     return "[SEPARATED]"
@@ -301,28 +304,32 @@ class Line(object):
                 # 若l2start在l1上，l2end不在，则l2end是端点
                 if Line.line_check_point_on(l2, l1.start):
                     # 若l1start在l2上，l1end不在，则l1end是端点
-                    # 【经过检测，这一条不会触发】
+                    print("situation 1")
                     return Line(l2.end, l1.end)
                 elif Line.line_check_point_on(l2, l1.end):
                     # 若l1end在l2上，l1start不在，则l1start是端点
-                    # 【经过检测，这一条不会触发】
+                    print("situation 2")
                     return Line(l2.end, l1.start)
             elif Line.line_check_point_on(l1, l2.start) and Line.line_check_point_on(l1,
                                                                                      l2.end):
                 # 若l2start在l1上，l2end也在，则l1end和l1start是端点
-                return l1
+                print("situation 3")
+                return Line(l1.start, l1.end)
             else:
                 # 若l2start不在l1上，l2end在，则l2start是端点
                 if Line.line_check_point_on(l2, l1.start):
                     # 若l1start在l2上，l1end不在，则l1end是端点
                     # 【经过检测，这一条不会触发】
+                    print("situation 4")
                     return Line(l2.start, l1.end)
                 elif Line.line_check_point_on(l2, l1.end):
                     # 若l1end在l2上，l1start不在，则l1start是端点
                     # 【经过检测，这一条不会触发】
+                    print("situation 5")
                     return Line(l2.start, l1.start)
                     # Line(Point(0,0),Point(4,4))
         else:
+            print("situation 6")
             return None
 
     @staticmethod
@@ -405,8 +412,8 @@ class Space(object):
                         index = edge_list_substitute_substitute.index(e2)
                         edge_list_substitute_substitute.insert(index, new_line)
                         edge_list_substitute_substitute.remove(e2)
-                    if Line.line_check_cross(e1, e2) == "[SHARED] totally the same":
-                        edge_list_substitute_substitute.remove(e1)
+                    # if Line.line_check_cross(e1, e2) == "[SHARED] totally the same":
+                    #     edge_list_substitute_substitute.remove(e1)
         # overkill done
         edge_list = edge_list_substitute_substitute
         for edge in edge_list:

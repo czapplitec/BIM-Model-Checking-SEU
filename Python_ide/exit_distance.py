@@ -50,7 +50,7 @@ for ira in model.by_type("IfcRelAggregates"):
             子循环，包含了：
                 1.平面生成、创建每个房间的基本属性对象(edge point destination)
                 2.作图
-            【疑问】：FOYER的点为0
+            【疑问】：FOYER和HALLWAY的点为0
             
             """
             space = Space(space_bigger.Name, space.GlobalId, space.LongName, space)
@@ -59,12 +59,15 @@ for ira in model.by_type("IfcRelAggregates"):
             point_list = space.point_list
             # 1.平面生成、创建每个房间的基本属性对象(edge point destination)
             ax.annotate(space.space_longname + ":" + str(len(space.point_list)),
-                        xy=(space.tag_of_space.x - 2.4, space.tag_of_space.y + 0.6), fontsize=72)
-            ax.scatter(space.tag_of_space.x, space.tag_of_space.y, color='green', s=4, alpha=0.5)
+                        xy=(space.tag_of_space.x , space.tag_of_space.y ), fontsize=72)
+            ax.scatter(space.tag_of_space.x, space.tag_of_space.y, color='green', s=200, alpha=0.5)
             for edge in edge_list:
                 ax.plot([edge.start.x, edge.end.x], [edge.start.y, edge.end.y], linewidth=4, color='black', alpha=0.3)
                 ax.scatter(edge.start.x, edge.start.y, color='red', s=25, alpha=0.5)
                 ax.scatter(edge.end.x, edge.end.y, color='blue', s=50, alpha=0.5)
+            """for space in spaces:
+                if space.LongName=="Foyer":
+                    print("LA")"""
             # for point in point_list:
             #     ax.scatter(point.x, point.y, color='red', s=25, alpha=0.5)
             print(space)
