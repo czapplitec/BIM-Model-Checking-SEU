@@ -11,6 +11,7 @@ model = ifcopenshell.open(os.path.dirname(__file__) + '/ifc/Duplex_A_20110505.if
 settings = geom.settings()
 settings.set(settings.USE_WORLD_COORDS, True)
 APPROXIMATION = 75
+o_factor = 1 / 100000
 a = len(str(APPROXIMATION))
 """
 basic_geometry是包含了所有类对象的tab。
@@ -54,7 +55,6 @@ class ZPoint(object):
             return False
 
     def __str__(self):
-        app = len(str(APPROXIMATION))
         msg = "(3D Point)" + str(self.x) + "," + str(self.y) + "," + str(self.z)
         return msg
 
@@ -81,9 +81,8 @@ class Point(object):
     def point_check_overlap(p1, p2):
         """
         检验两个点是否重合
-        （因为输入的过程中已有取整，所以不用写成约等于）
         """
-        if p1.x == p2.x and p1.y == p2.y:
+        if abs(p1.x - p2.x) <= o_factor and abs(p1.y - p2.y) <= o_factor:
             return True
         else:
             return False
@@ -172,6 +171,7 @@ class Line(object):
     Line用标准式Ax+By+C=0表示，水平则A=0，垂直则B=0
     【疑问】合并直线目前还没有用上
     【疑问】Line的除重与除逆必须用近似值处理
+    【3月6日】直线当中实际上起点和终点都是ZPoint
     """
 
     def __init__(self, p1, p2):
@@ -216,7 +216,6 @@ class Line(object):
     @staticmethod
     def line_check_point_on(line, p):
         r_factor = 1 / 15
-        o_factor = 1 / 10000
         if line.B != 0:
             if line.start.x <= line.end.x:
                 left_x = line.start.x
@@ -317,30 +316,31 @@ class Line(object):
                 # 若l2start在l1上，l2end不在，则l2end是端点
                 if Line.line_check_point_on(l2, l1.start):
                     # 若l1start在l2上，l1end不在，则l1end是端点
-                    print("situation 1")
+                    # print("situation 1")
+                    # 其实这种情况不会出现，因为所有线都是顺或逆时针，所以不可能有两个start或两个end的线
                     return Line(l2.end, l1.end)
                 elif Line.line_check_point_on(l2, l1.end):
                     # 若l1end在l2上，l1start不在，则l1start是端点
-                    print("situation 2")
-                    return Line(l2.end, l1.start)
+                    # print("situation 2")
+                    return Line(l1.start,l2.end)
             elif Line.line_check_point_on(l1, l2.start) and Line.line_check_point_on(l1,
                                                                                      l2.end):
                 # 若l2start在l1上，l2end也在，则l1end和l1start是端点
-                print("situation 3")
+                # print("situation 3")
                 return Line(l1.start, l1.end)
             else:
                 # 若l2start不在l1上，l2end在，则l2start是端点
                 if Line.line_check_point_on(l2, l1.start):
                     # 若l1start在l2上，l1end不在，则l1end是端点
                     # 【经过检测，这一条不会触发】
-                    print("situation 4")
+                    # print("situation 4")
                     return Line(l2.start, l1.end)
                 elif Line.line_check_point_on(l2, l1.end):
                     # 若l1end在l2上，l1start不在，则l1start是端点
                     # 【经过检测，这一条不会触发】
-                    print("situation 5")
+                    # print("situation 5")
                     return Line(l2.start, l1.start)
-                    # Line(Point(0,0),Point(4,4))
+                    # 其实这种情况不会出现，因为所有线都是顺或逆时针，所以不可能有两个start或两个end的线
         else:
             print("situation 6")
             return None
@@ -377,7 +377,7 @@ class Space(object):
         verts = shape.geometry.verts
         faces = shape.geometry.faces
         edge_list_original = []
-        point_list = []
+        point_list_original = []
         # 输入坐标环节，是程序中唯一的三维部分
         for i in range(0, len(faces) - 1, 3):
             p1 = ZPoint(verts[3 * faces[i] + 0], verts[3 * faces[i] + 1],
@@ -389,9 +389,9 @@ class Space(object):
             nv = Vector.multiply(Vector(p1, p2), Vector(p1, p3))
             ref = Vector(ZPoint(0, 0, -1), ZPoint(0, 0, 0))
             if Vector.vector_check_parallel(ref, nv):
-                edge_list_original.append(Line(p1, p2))
-                edge_list_original.append(Line(p2, p3))
-                edge_list_original.append(Line(p3, p1))
+                edge_list_original.append(Line(p1.get_dimensional(), p2.get_dimensional()))
+                edge_list_original.append(Line(p2.get_dimensional(), p3.get_dimensional()))
+                edge_list_original.append(Line(p3.get_dimensional(), p1.get_dimensional()))
         edge_list_substitute = edge_list_original
         duplicated_edges = set()
         # 除相反环节:用negative
@@ -407,9 +407,6 @@ class Space(object):
                 if Line.duplicated(edge, e):
                     edge_list_substitute.remove(e)
         edge_list_substitute_substitute = edge_list_substitute
-        # if space_longname == "Bathroom 1":
-        #     for edge in edge_list_substitute:
-        #         print(edge)
         """
         overkill环节
         edge_list_substitute_substitute是第二个替代品（用于在for循环中不显得混乱）
@@ -428,12 +425,14 @@ class Space(object):
                         index = edge_list_substitute_substitute.index(e2)
                         edge_list_substitute_substitute.insert(index, new_line)
                         edge_list_substitute_substitute.remove(e2)
-                    # if Line.line_check_cross(e1, e2) == "[SHARED] totally the same":
-                    #     edge_list_substitute_substitute.remove(e1)
-        # overkill done
+        # overkill 解决啦（考虑到“完全重叠”的现象没有定义，别的模型不一定能用，）
+        # 下一步应解决点的问题（经历了overkill，所有直线不再是统一顺或逆时针了
         edge_list = edge_list_substitute_substitute
         for edge in edge_list:
-            point_list.append(edge.start)  # 确认边清理完毕后，点列即为“每个边的端点”，此处取起点
+            point_list_original.append(edge.start)
+        point_list = point_list_original
+        # 确认边清理完毕后，点列即为“每个边的端点”，此处取起点
+        # 严格地来说，是因为mesh有同向的特性，才可以不特地除重
         tag_of_space = bounding_box(point_list)  # tag_of_space是标签的起点
         self.point_list = point_list
         self.edge_list = edge_list

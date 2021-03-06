@@ -24,7 +24,13 @@ plt.figure(figsize=(100, 100))
 ########################################################################################################################
 ########################################################################################################################
 print("TEST START")
-
+# list_A = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4]
+# list_B = [0, 1, 2, 3, 4]
+# for a in list_A:
+#     for b in list_A:
+#         if a - b == 0:
+#             list_A.remove(a)
+#             print(a, b)
 print("TEST END")
 ########################################################################################################################
 ########################################################################################################################
@@ -59,7 +65,7 @@ for ira in model.by_type("IfcRelAggregates"):
             point_list = space.point_list
             # 1.平面生成、创建每个房间的基本属性对象(edge point destination)
             ax.annotate(space.space_longname + ":" + str(len(space.point_list)),
-                        xy=(space.tag_of_space.x , space.tag_of_space.y ), fontsize=72)
+                        xy=(space.tag_of_space.x, space.tag_of_space.y), fontsize=72)
             ax.scatter(space.tag_of_space.x, space.tag_of_space.y, color='green', s=200, alpha=0.5)
             for edge in edge_list:
                 ax.plot([edge.start.x, edge.end.x], [edge.start.y, edge.end.y], linewidth=4, color='black', alpha=0.3)
@@ -71,9 +77,10 @@ for ira in model.by_type("IfcRelAggregates"):
             # for point in point_list:
             #     ax.scatter(point.x, point.y, color='red', s=25, alpha=0.5)
             print(space)
-        # plt.show()
-        # 2.作图
+            # plt.show()
+            # 2.作图
             for IfcRelSpaceBoundary in model.by_type("IfcRelSpaceBoundary"):
+                # print("1")
                 """
                 本循环建立于"IfcRelSpaceBoundary"，主要负责由门到Destination的转化（包括投影）
                 一个IfcRelSpaceBoundary对应一个space，一个IfcRelSpaceBoundary对应一个IfcBuildingElement
