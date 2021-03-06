@@ -1,5 +1,5 @@
 import numpy as np
-from basic_geometry import Point, Line
+from basic_geometry import Point
 
 Inf = float('Inf')
 APPROXIMATION_OF_POINT = 10000
@@ -57,6 +57,8 @@ def dijkstra(adj, src, dst, n):
 ########################################################################################################################
 ########################################################################################################################
 def line_check(frontier_line_list, list_of_points, path):
+    from basic_geometry import Line
+    # 【3月6日】能有别的也叫Line，所以不得不在此处新引用一次
     """
     下面是判断直线是否出界的算法：
     1.path和frontier有公共点，要么交叉，要么重合
@@ -67,15 +69,12 @@ def line_check(frontier_line_list, list_of_points, path):
         2.2.反之则不出界
     """
     outcome = False
-    path_line = path.turn_it_to_a_line()
     for frontier in frontier_line_list:
-        if not path_line == frontier:
-            crossed, overlapped = Line.cross_check(frontier, path_line)
-            if crossed and not overlapped:
+        if not path == frontier:
+            if Line.line_check_cross(frontier, path) == "[CROSSED]: not on edge":
                 outcome = True
             else:
-                mid_point = Point((path_line.s1.x + path_line.s2.x) / 2, (path_line.s1.y + path_line.s2.y) / 2,
-                                  path_line.s1.z)
+                mid_point = Point((path.start.x + path.end.x) / 2, (path.start.y + path.end.y) / 2)
                 outcome = point_check_polygon(mid_point, list_of_points)
     return outcome
 
@@ -103,7 +102,7 @@ def point_check_polygon(p, poly):
         if (sx == px and sy == py) or (tx == px and ty == py):
             return px, py
         # 判断线段两端点是否在射线两侧
-        if (sy < py & ty >= py) | (sy >= py & ty < py):
+        if ty >= py > sy or sy >= py > ty:
             # 线段上与射线 Y 坐标相同的点的 X 坐标
             x = sx + (py - sy) * (tx - sx) / (ty - sy)
             # 点在多边形的边上
@@ -157,12 +156,12 @@ def bounding_box(list_of_points):
         return Point((maxx + minx) / 2, (maxy + miny) / 2)
 
 
-
 # 这个函数用来输出矩阵中的第n大的值，用于dijkstra算法。因为最大值是inf，所以最大逃生距离是第二大的值
 def find_sub_max(arr, n):
-    z = arr
     for i in range(n - 1):
         arr_ = arr
         arr_[np.argmax(arr_)] = np.min(arr)
+        # 把最大的换成最小值。n=1时不换，n=2时换一次
         arr = arr_
-    return np.max(arr_), z.index(np.max(arr_))
+    z = arr
+    return np.max(arr), z.index(np.max(arr))

@@ -188,6 +188,7 @@ class Line(object):
         self.A = p2.y - p1.y
         self.B = p1.x - p2.x
         self.C = p2.x * p1.y - p1.x * p2.y
+        self.length = math.sqrt((p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y))
         # 修改ABC，使之符合标准式
         if p2.y - p1.y == 0:  # 水平，A=0，B为1
             self.A = 0
@@ -322,7 +323,7 @@ class Line(object):
                 elif Line.line_check_point_on(l2, l1.end):
                     # 若l1end在l2上，l1start不在，则l1start是端点
                     # print("situation 2")
-                    return Line(l1.start,l2.end)
+                    return Line(l1.start, l2.end)
             elif Line.line_check_point_on(l1, l2.start) and Line.line_check_point_on(l1,
                                                                                      l2.end):
                 # 若l2start在l1上，l2end也在，则l1end和l1start是端点
@@ -466,8 +467,8 @@ class Door(object):
     值得注意的是，求投影的步骤应在主程序中进行。
     """
 
-    def __init__(self, space_belonged, door_guid):
-        shape = geom.create_shape(settings, self)
+    def __init__(self, space_belonged, door_guid, door_itself):
+        shape = geom.create_shape(settings, door_itself)
         verts = shape.geometry.verts
         points = []
         for i in range(0, len(verts) - 1, 3):
