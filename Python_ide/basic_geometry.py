@@ -55,7 +55,7 @@ class ZPoint(object):
 
     def __str__(self):
         app = len(str(APPROXIMATION))
-        msg = "(3D Point)" + str(self.x).ljust(app, " ") + str(self.y).ljust(app, " ") + str(self.z).ljust(app, " ")
+        msg = "(3D Point)" + str(self.x) + "," + str(self.y) + "," + str(self.z)
         return msg
 
     def get_dimensional(self):
@@ -216,16 +216,29 @@ class Line(object):
     @staticmethod
     def line_check_point_on(line, p):
         r_factor = 1 / 15
-        if line.start.x <= line.end.x:
-            left_x = line.start.x
-            right_x = line.end.x
+        o_factor = 1 / 10000
+        if line.B != 0:
+            if line.start.x <= line.end.x:
+                left_x = line.start.x
+                right_x = line.end.x
+            else:
+                right_x = line.start.x
+                left_x = line.end.x
+            if abs(p.x * line.A + p.y * line.B + line.C) <= r_factor and left_x <= p.x <= right_x:
+                return True
+            else:
+                return False
         else:
-            right_x = line.start.x
-            left_x = line.end.x
-        if abs(p.x * line.A + p.y * line.B + line.C) <= r_factor and left_x <= p.x <= right_x:
-            return True
-        else:
-            return False
+            if line.start.y >= line.end.y:
+                up_y = line.start.y
+                down_y = line.end.y
+            else:
+                down_y = line.start.y
+                up_y = line.end.y
+            if abs(p.x * line.A + p.y * line.B + line.C) <= r_factor and up_y >= p.y >= down_y:
+                return True
+            else:
+                return False
 
     """
     【3月4日检测】：发现问题是没有规定直线的边界点 已修复。
@@ -240,10 +253,10 @@ class Line(object):
         c1 = l1.C
         c2 = l2.C
         # 首先检测重合
-        t_factor = 1 / 10
+        t_factor = 1 / 10000
         if abs(a1 - a2) <= t_factor and abs(b1 - b2) <= t_factor:
             # if a1 == a2 and b1 == b2:  # 平行
-            if c1 == c2:  # 完全重合
+            if abs(c1 - c2) <= t_factor:  # 完全重合
                 return "[SHARED] can be composed"
                 # 【3月4日检测】：有一部分overkill失败的原因就是错误当成重合
                 # return "[SHARED] totally the same"
@@ -394,6 +407,9 @@ class Space(object):
                 if Line.duplicated(edge, e):
                     edge_list_substitute.remove(e)
         edge_list_substitute_substitute = edge_list_substitute
+        # if space_longname == "Bathroom 1":
+        #     for edge in edge_list_substitute:
+        #         print(edge)
         """
         overkill环节
         edge_list_substitute_substitute是第二个替代品（用于在for循环中不显得混乱）

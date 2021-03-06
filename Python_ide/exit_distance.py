@@ -15,9 +15,9 @@ settings.set(settings.USE_WORLD_COORDS, True)
 plt.figure(figsize=(100, 100))
 """
 【3月4日检测】：
-1. 一层整体存在偏移问题
+1. 一层整体存在偏移问题 【3月6日：经证实，是因为Hallway没有正确显示】
 2. foyer不能正确显示
-3. overkill不能正确返回（每一次都是若l2start在l1上，l2end也在，则l1end和l1start是端点）
+3. 【已解决】overkill不能正确返回（每一次都是若l2start在l1上，l2end也在，则l1end和l1start是端点）【3月6日：经证实，是因为未确立直线的终点】
 4. 后段代码未响应。
 5. boundingbox点明显不对
 """
