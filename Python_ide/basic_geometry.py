@@ -10,7 +10,7 @@ model = ifcopenshell.open(os.path.dirname(__file__) + '/ifc/Duplex_A_20110505.if
 
 settings = geom.settings()
 settings.set(settings.USE_WORLD_COORDS, True)
-APPROXIMATION = 75
+APPROXIMATION = 1000
 o_factor = 1 / 100000
 a = len(str(APPROXIMATION))
 """
@@ -55,7 +55,7 @@ class ZPoint(object):
             return False
 
     def __str__(self):
-        msg = "(3D Point)" + str(self.x) + "," + str(self.y) + "," + str(self.z)
+        msg = "(3D Point)" + str(self.x).ljust(5,"") + "," + str(self.y).ljust(5,"") + "," + str(self.z).ljust(5,"")
         return msg
 
     def get_dimensional(self):
@@ -88,7 +88,8 @@ class Point(object):
             return False
 
     def __str__(self):
-        msg = "(Point) " + "x:" + str(self.x).ljust(a, " ") + "y:" + str(self.y).ljust(a, " ")
+        msg = "(Point) " + "x:" + str(approximation_of_a_real_number(self.x)).ljust(5, " ") + "  y:" + str(approximation_of_a_real_number(
+            self.y)).ljust(5, " ")
         return msg
 
 
@@ -180,34 +181,49 @@ class Line(object):
         表达式为标准式。
         【疑问】在测试中，出现了完全重合的两个点的直线。
         """
-        self.start = p1
-        self.end = p2
-        self.x = p2.x - p1.x
-        self.y = p2.y - p1.y  # 终点减起点
-        self.arr = np.array([self.x, self.y])
-        self.A = p2.y - p1.y
-        self.B = p1.x - p2.x
-        self.C = p2.x * p1.y - p1.x * p2.y
-        self.length = math.sqrt((p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y))
-        # 修改ABC，使之符合标准式
-        if p2.y - p1.y == 0:  # 水平，A=0，B为1
-            self.A = 0
-            self.B = 1
-            if p1.x - p2.x == 0:
-                self.C = None
-            else:
-                self.C = (p2.x * p1.y - p1.x * p2.y) / (p1.x - p2.x)
-        elif p2.x - p1.x == 0:  # 垂直，B=0，A为1
-            self.A = 1
-            self.B = 0
-            if p1.y - p2.y == 0:
-                self.C = None
-            else:
-                self.C = (p2.x * p1.y - p1.x * p2.y) / (p2.y - p1.y)
+        if p1 is None and p2 is None:
+            self.start = None
+            self.end = None
+            self.x = None
+            self.y = None
+            self.arr = None
+            self.A = None
+            self.B = None
+            self.C = None
+            self.length = None
+
+            # 进行这一步设置是为了除重除相反方便，remove之前可以赋值为Line（None，None）
         else:
-            self.A = (p2.y - p1.y) / (p2.y - p1.y)
-            self.B = (p1.x - p2.x) / (p2.y - p1.y)
-            self.C = (p2.x * p1.y - p1.x * p2.y) / (p2.y - p1.y)
+            self.start = p1
+            self.end = p2
+            self.x = p2.x - p1.x
+            self.y = p2.y - p1.y  # 终点减起点
+            self.arr = np.array([self.x, self.y])
+            self.A = p2.y - p1.y
+            self.B = p1.x - p2.x
+            self.C = p2.x * p1.y - p1.x * p2.y
+            self.length = math.sqrt((p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y))
+            # 修改ABC，使之符合标准式
+            if p2.y - p1.y == 0:  # 水平，A=0，B为1
+                self.A = 0
+                self.B = 1
+                if p1.x - p2.x == 0:
+                    print("Error!")
+                    self.C = None
+                else:
+                    self.C = (p2.x * p1.y - p1.x * p2.y) / (p1.x - p2.x)
+            elif p2.x - p1.x == 0:  # 垂直，B=0，A为1
+                self.A = 1
+                self.B = 0
+                if p1.y - p2.y == 0:
+                    print("Error!")
+                    self.C = None
+                else:
+                    self.C = (p2.x * p1.y - p1.x * p2.y) / (p2.y - p1.y)
+            else:
+                self.A = (p2.y - p1.y) / (p2.y - p1.y)
+                self.B = (p1.x - p2.x) / (p2.y - p1.y)
+                self.C = (p2.x * p1.y - p1.x * p2.y) / (p2.y - p1.y)
 
     def __str__(self):
         msg = "(Line) " + ("(" + str(self.A) + ")*x+(" + str(self.B) + ")*y+(" + str(
@@ -216,7 +232,7 @@ class Line(object):
 
     @staticmethod
     def line_check_point_on(line, p):
-        r_factor = 1 / 15
+        r_factor = 1 / 15000
         if line.B != 0:
             if line.start.x <= line.end.x:
                 left_x = line.start.x
@@ -287,8 +303,8 @@ class Line(object):
     @staticmethod
     def line_get_foot(line, p):
         if Line.line_check_point_on(line, p):
-            print("You are trying to get foot point from a point on the line, it doesn't exist.")
-            return ConnectionRefusedError
+            print("You are trying to get foot point from a point on the line, returns itself.")
+            return p
         else:
             x0 = p.x
             y0 = p.y
@@ -305,9 +321,11 @@ class Line(object):
     @staticmethod
     def line_get_point_distance(line, p):
         foot = Line.line_get_foot(line, p)
-        if foot != ConnectionRefusedError:
+        if foot:
             distance = math.sqrt((foot.x - p.x) ** 2 + (foot.y - p.y) ** 2)
             return distance
+        else:
+            return 0
 
     @staticmethod
     def line_get_overkill(l1, l2):
