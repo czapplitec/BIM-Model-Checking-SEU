@@ -11,7 +11,7 @@ model = ifcopenshell.open(os.path.dirname(__file__) + '/ifc/Duplex_A_20110505.if
 settings = geom.settings()
 settings.set(settings.USE_WORLD_COORDS, True)
 APPROXIMATION = 1000
-o_factor = 1 / 100000
+o_factor = 1 / 10000
 a = len(str(APPROXIMATION))
 """
 basic_geometry是包含了所有类对象的tab。
@@ -55,7 +55,7 @@ class ZPoint(object):
             return False
 
     def __str__(self):
-        msg = "(3D Point)" + str(self.x).ljust(5,"") + "," + str(self.y).ljust(5,"") + "," + str(self.z).ljust(5,"")
+        msg = "(3D Point)" + str(self.x).ljust(5, "") + "," + str(self.y).ljust(5, "") + "," + str(self.z).ljust(5, "")
         return msg
 
     def get_dimensional(self):
@@ -74,8 +74,8 @@ class Point(object):
     """
 
     def __init__(self, x, y):
-        self.x = approximation_of_a_real_number(x)
-        self.y = approximation_of_a_real_number(y)
+        self.x = float(approximation_of_a_real_number(x))
+        self.y = float(approximation_of_a_real_number(y))
 
     @staticmethod
     def point_check_overlap(p1, p2):
@@ -88,8 +88,9 @@ class Point(object):
             return False
 
     def __str__(self):
-        msg = "(Point) " + "x:" + str(approximation_of_a_real_number(self.x)).ljust(5, " ") + "  y:" + str(approximation_of_a_real_number(
-            self.y)).ljust(5, " ")
+        msg = "(" + str(approximation_of_a_real_number(self.x)).ljust(5, " ") + "," + str(
+            approximation_of_a_real_number(
+                self.y)).ljust(5, " ") + ")"
         return msg
 
 
@@ -208,7 +209,9 @@ class Line(object):
                 self.A = 0
                 self.B = 1
                 if p1.x - p2.x == 0:
+                    print(" ")
                     print("Error!")
+                    print(p1)
                     self.C = None
                 else:
                     self.C = (p2.x * p1.y - p1.x * p2.y) / (p1.x - p2.x)
@@ -216,7 +219,9 @@ class Line(object):
                 self.A = 1
                 self.B = 0
                 if p1.y - p2.y == 0:
+                    print(" ")
                     print("Error!")
+                    print(p1)
                     self.C = None
                 else:
                     self.C = (p2.x * p1.y - p1.x * p2.y) / (p2.y - p1.y)
@@ -292,13 +297,20 @@ class Line(object):
             new_x = dictionary.get(x)
             new_y = dictionary.get(y)
             math.isclose(new_x, l1.start.x)
-            if (math.isclose(new_x, l1.start.x) & math.isclose(new_y, l1.start.y)) | (
-                    math.isclose(new_x, l1.end.x) & math.isclose(new_y, l1.end.y)) | (
-                    math.isclose(new_x, l2.start.x) & math.isclose(new_y, l2.start.y)) | (
-                    math.isclose(new_x, l2.end.x) & math.isclose(new_y, l2.end.y)):
+            if (math.isclose(new_x, l1.start.x, rel_tol=o_factor) & math.isclose(new_y, l1.start.y,
+                                                                                 rel_tol=o_factor)) | (
+                    math.isclose(new_x, l1.end.x, rel_tol=o_factor) & math.isclose(new_y, l1.end.y,
+                                                                                   rel_tol=o_factor)) | (
+                    math.isclose(new_x, l2.start.x, rel_tol=o_factor) & math.isclose(new_y, l2.start.y,
+                                                                                     rel_tol=o_factor)) | (
+                    math.isclose(new_x, l2.end.x, rel_tol=o_factor) & math.isclose(new_y, l2.end.y, rel_tol=o_factor)):
                 return "[CROSSED]: on edge"
             else:
-                return "[CROSSED]: not on edge"
+                if Line.line_check_point_on(l1, Point(new_x, new_y)) and Line.line_check_point_on(l2,
+                                                                                                  Point(new_x, new_y)):
+                    return "[CROSSED]: not on edge"
+                else:
+                    return "[SEPARATED]"
 
     @staticmethod
     def line_get_foot(line, p):
@@ -445,10 +457,19 @@ class Space(object):
                         edge_list_substitute_substitute.insert(index, new_line)
                         edge_list_substitute_substitute.remove(e2)
         # overkill 解决啦（考虑到“完全重叠”的现象没有定义，别的模型不一定能用，）
-        # 下一步应解决点的问题（经历了overkill，所有直线不再是统一顺或逆时针了
+        # 下一步应解决点的问题（经历了overkill，所有直线依然是统一顺或逆时针）
         edge_list = edge_list_substitute_substitute
-        for edge in edge_list:
-            point_list_original.append(edge.start)
+        n_e = len(edge_list)
+        point_list_original = []
+        for i in range(n_e):
+            if i == 0:
+                point_list_original.append(edge_list[i].end)
+            else:
+                for edge in edge_list:
+                    if Point.point_check_overlap(point_list_original[i - 1], edge.start):
+                        point_list_original.append(edge.end)
+        # for edge in edge_list:
+        #     point_list_original.append(edge.start)
         point_list = point_list_original
         # 确认边清理完毕后，点列即为“每个边的端点”，此处取起点
         # 严格地来说，是因为mesh有同向的特性，才可以不特地除重
@@ -466,12 +487,16 @@ class Space(object):
         self.space_guid = space_guid
 
     def __str__(self):
-        msg = "(Space): " + "{Storey}: " + str(self.storey_name) + "  {Name}: " + str(
-            self.space_longname).ljust(12, " ") + "  {Guid}: " + str(
-            self.space_guid) + "  {Has got ? destinations}: " + str(
-            str(self.destination_list)) + "  {The best one is}: " + str(
-            self.best_destination) + "  {Exit distance}: " + str(self.exit_distance) + "  {POINTS}: " + str(
-            len(self.point_list)) + "  {EDGES}: " + str(len(self.edge_list))
+        if self.point_list and self.destination_list:
+            msg = "(Space): " + "{Storey}: " + str(self.storey_name) + "  {Name}: " + str(
+                self.space_longname).ljust(12, " ") + "  {Guid}: " + str(
+                self.space_guid) + "  {Number of doors}: " + str(
+                len(self.destination_list)) + "  {Exit distance}: " + str(self.exit_distance) + "  {POINTS}: " + str(
+                len(self.point_list)) + "  {EDGES}: " + str(len(self.edge_list))
+        else:
+            msg = "(Space): " + "{Storey}: " + str(self.storey_name) + "  {Name}: " + str(
+                self.space_longname).ljust(12, " ") + "  {Guid}: " + str(
+                self.space_guid)
         return msg
 
 
